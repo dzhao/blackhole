@@ -1,0 +1,14 @@
+[package]
+name = "blackhole"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rocksdb = "0.22.0"
+criterion = "0.5"
+rand = "0.8"
+lmdb = "0.8"
+
+[[bench]]
+name = "rocksdb_benchmarks"
+harness = false
