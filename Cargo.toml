@@ -9,6 +9,11 @@ criterion = "0.5"
 rand = "0.8"
 lmdb = "0.8"
 
+
 [[bench]]
 name = "rocksdb_benchmarks"
+harness = false
+
+[[bench]]
+name = "lmdb_benchmarks"
 harness = false
