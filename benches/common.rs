@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::thread;
 use rand::Rng;
 const EMBEDDING_SIZE:usize = 3*1024;
-const READ_BATCH: usize = 10_000;
-const NUM_KEYS: usize = 10_000_0;
+const READ_BATCH: usize = 1_00;
+const NUM_KEYS: usize = 1_000_000;
 pub trait DbInterface: Send + Sync {
     fn db_type(&self) -> String;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
@@ -14,15 +14,16 @@ pub trait DbInterface: Send + Sync {
     fn close(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>) {
+pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, key_prefix: &str) -> Vec<Vec<u8>> {
     let value = "x".repeat(EMBEDDING_SIZE).into_bytes();
     let start_time = std::time::Instant::now();
     let mut idx = 0;
     let write_batch_size = 1000;
     let mut batch = vec![];
-
+    let mut keys = vec![];
     while !should_stop.load(Ordering::Relaxed) && idx < NUM_KEYS {
-        let key = format!("key_{:010}", idx).into_bytes();
+        let key = format!("{}_{:010}", key_prefix, idx).into_bytes();
+        keys.push(key.clone());
          if batch.len() == write_batch_size {
             db.batch_put(&batch).expect("Failed to batch put");
             batch.clear();
@@ -39,9 +40,10 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
     let duration = start_time.elapsed();
     let throughput = idx as f64 / duration.as_secs_f64();
     println!(
-        "Writer thread finished. Total keys written: {}, Duration: {:.2?}, Throughput: {:.2} keys/sec",
-        idx, duration, throughput
+        "Writer thread finished for {}. Total keys written: {}, Duration: {:.2?}, Throughput: {:.2} keys/sec",
+        key_prefix, idx, duration, throughput
     );
+    return keys;
 }
 
 pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
@@ -49,16 +51,7 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
     let db = Arc::new(db);
     
     // Prepare test data 
-    let value = "x".repeat(EMBEDDING_SIZE).into_bytes();
-    let sequential_keys: Vec<Vec<u8>> = (0..NUM_KEYS)
-        .map(|i| format!("record_key_{:010}", i).into_bytes())
-        .collect();
-    
-    // Insert test data
-    for keys in sequential_keys.chunks(1000) {
-        let kvs: Vec<_> = keys.iter().map(|k| (k.clone(), value.clone())).collect();
-        db.batch_put(&kvs).expect("Failed to insert test data");
-    }
+    let sequential_keys = writer_thread(db.clone(), Arc::new(AtomicBool::new(false)), "prewrite");
     
     // Start background writer
     let should_stop = Arc::new(AtomicBool::new(false));
@@ -66,14 +59,21 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
     let writer_stop = Arc::clone(&should_stop);
     
     let writer_handle = thread::spawn(move || {
-        writer_thread(writer_db, writer_stop);
+        writer_thread(writer_db, writer_stop, "postwrite");
     });
     
     // Benchmark sequential reads
     group.bench_function(BenchmarkId::new("sequential_reads", ""), |b| {
         b.iter(|| {
+            let mut not_found = 0;
             for key in &sequential_keys[0..READ_BATCH] {
-                db.get(key).expect("Read failed");
+                let v = db.get(key).expect("Read failed");
+                if v.is_none() {
+                    not_found += 1;
+                }
+            }
+            if not_found > 0 {
+                println!("Not found: {}", not_found);
             }
         });
     });
