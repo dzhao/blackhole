@@ -1,6 +1,6 @@
 mod common;
 use criterion::{criterion_group, criterion_main, Criterion};
-use lmdb::{Environment, Database, DatabaseFlags, WriteFlags, Transaction};
+use lmdb::{Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
 use common::DbInterface;
 
 struct LmdbWrapper {
@@ -29,16 +29,29 @@ impl DbInterface for LmdbWrapper {
         }
     }
 
-    fn close(self: Box<Self>) {
-        drop(self.env)
+    fn batch_put(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
+        let mut txn = self.env.begin_rw_txn()?;
+        for (key, value) in items {
+            txn.put(self.db, key, value, WriteFlags::default())?;
+        }
+        txn.commit()?;
+        Ok(())
+    }
+
+    fn close(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let stat = self.env.stat().unwrap();
+        println!("Closing LMDB environment, stats: {}, {}, {}", stat.page_size(), stat.depth(), stat.leaf_pages());
+        // LMDB automatically closes when env is dropped
+        // Just implement the trait method with empty body
+        Ok(())
     }
 }
 
 fn setup_lmdb() -> Box<dyn DbInterface> {
     let env = Environment::new()
-        .set_map_size(1024 * 1024 * 1024) // 1GB
+        .set_map_size(80*1024_usize.pow(3)) // 1TB
         .set_max_dbs(1)
-        .open(std::path::Path::new("/tmp/lmdb_bench"))
+        .open(std::path::Path::new("./lmdb_bench"))
         .unwrap();
     let db = env.create_db(Some("default"), DatabaseFlags::default()).unwrap();
     Box::new(LmdbWrapper { env, db })
