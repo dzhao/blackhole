@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use rand::Rng;
-const EMBEDDING_SIZE:usize = 3*1024;
+const EMBEDDING_SIZE:usize = 768;
 const READ_BATCH: usize = 1_00;
-const NUM_KEYS: usize = 1_000_000;
+const NUM_KEYS: usize = 4_000_000;
 pub trait DbInterface: Send + Sync {
     fn db_type(&self) -> String;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
@@ -15,7 +15,6 @@ pub trait DbInterface: Send + Sync {
 }
 
 pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, key_prefix: &str) -> Vec<Vec<u8>> {
-    let value = "x".repeat(EMBEDDING_SIZE).into_bytes();
     let start_time = std::time::Instant::now();
     let mut idx = 0;
     let write_batch_size = 1000;
@@ -29,7 +28,7 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
             batch.clear();
         }
         else {
-            batch.push((key, value.clone()));
+            batch.push((key, generate_random_embedding()));
         }
         idx += 1;
     }
@@ -70,6 +69,9 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
                 let v = db.get(key).expect("Read failed");
                 if v.is_none() {
                     not_found += 1;
+                }
+                else {
+                    assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4);
                 }
             }
             if not_found > 0 {
@@ -121,4 +123,10 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
         eprintln!("Failed to close database: {:?}", e);
     }
     group.finish();
+} 
+
+pub fn generate_random_embedding() -> Vec<u8> {
+    let mut rng = rand::thread_rng();
+    let embeddings: Vec<f32> = (0..EMBEDDING_SIZE).map(|_| rng.gen::<f32>()).collect();
+    embeddings.into_iter().map(|f| f.to_ne_bytes()).flatten().collect()
 } 
