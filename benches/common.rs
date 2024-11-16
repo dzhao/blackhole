@@ -3,16 +3,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use rand::Rng;
+use blackhole::DbInterface;
 const EMBEDDING_SIZE:usize = 768;
 const READ_BATCH: usize = 1_00;
 const NUM_KEYS: usize = 4_000_000;
-pub trait DbInterface: Send + Sync {
-    fn db_type(&self) -> String;
-    fn put(&self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>>;
-    fn batch_put(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>>;
-    fn close(&self) -> Result<(), Box<dyn std::error::Error>>;
-}
 
 pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, key_prefix: &str) -> Vec<Vec<u8>> {
     let start_time = std::time::Instant::now();
