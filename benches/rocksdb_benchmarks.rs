@@ -38,7 +38,7 @@ impl DbInterface for RocksDbWrapper {
 fn setup_rocks() -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     opts.create_if_missing(true);
-    // opts.set_write_buffer_size(1024 * 1024 * 1024); // 64MB
+    opts.set_write_buffer_size(1024 * 1024 * 1024); // 64MB
     opts.set_max_write_buffer_number(3);
     
     Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_bench").unwrap()))

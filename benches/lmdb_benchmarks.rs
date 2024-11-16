@@ -53,7 +53,7 @@ fn setup_lmdb() -> Box<dyn DbInterface> {
         .set_max_dbs(1)
         .open(std::path::Path::new("./lmdb_bench"))
         .unwrap();
-    let db = env.create_db(Some("default"), DatabaseFlags::default()).unwrap();
+    let db = env.create_db(None, DatabaseFlags::default()).unwrap();
     Box::new(LmdbWrapper { env, db })
 }
 fn bench_lmdb(c: &mut Criterion) {
