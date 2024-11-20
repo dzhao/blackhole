@@ -17,3 +17,15 @@ harness = false
 [[bench]]
 name = "lmdb_benchmarks"
 harness = false
+
+[[bin]]
+name = "perf_test"
+path = "src/perf_test/main.rs"
+
+[[bin]]
+name = "training"
+path = "src/training/main.rs"
+
+[[bin]]
+name = "serving"
+path = "src/serving/main.rs"
