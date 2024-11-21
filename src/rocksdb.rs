@@ -1,4 +1,4 @@
-use rocksdb::{DB, Options};
+use rocksdb::{Options, SliceTransform, DB};
 use crate::DbInterface;
 
 pub struct RocksDbWrapper(DB);

@@ -1,7 +1,7 @@
 use arrow_flight::{
     encode::FlightDataEncoderBuilder, flight_service_server::{FlightService, FlightServiceServer}, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket
 };
-use std::{pin::Pin, sync::Arc};
+use std::{ops::Deref, pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
 use futures::{stream::{self, BoxStream}, Stream};
 use futures::{StreamExt, TryStreamExt};
@@ -65,8 +65,61 @@ impl FlightService for FlightDbServer {
         &self,
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
-        let ticket = request.into_inner();
-        
+        use arrow::array::{StructArray, ListArray, StringArray, Int32Array};
+        use arrow::ipc::reader::StreamReader;
+
+        // Assuming `ticket_bytes` is the bytes from the Flight ticket
+        let ticket = request.into_inner().ticket;
+        let mut reader = StreamReader::try_new(ticket.deref(), None)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let batch = reader.next()
+            .unwrap()
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        // Get the struct array
+        let struct_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .unwrap();
+
+// Extract the list arrays
+        let feature_list = struct_array
+            .column(0)
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .unwrap();
+        let id_list = struct_array
+            .column(1)
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .unwrap();
+        let ts_list = struct_array
+            .column(2)
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .unwrap();
+
+        // Get the values
+        let features = feature_list
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let ids = id_list
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let tses = ts_list
+            .values()
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+
+        for f in features {
+            println!("{}", f.unwrap());
+        } 
         // let result = self.db.get(&ticket.ticket)
             // .map_err(|e| Status::internal(e.to_string()))?;
         let result = Some(vec![1, 2, 3, 4, 5]);
