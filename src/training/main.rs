@@ -1,12 +1,16 @@
 use arrow_flight::{
-    flight_service_server::{FlightService, FlightServiceServer}, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket
+    encode::FlightDataEncoderBuilder, flight_service_server::{FlightService, FlightServiceServer}, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket
 };
-use std::pin::Pin;
+use std::{pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
-use futures::Stream;
+use futures::{stream::{self, BoxStream}, Stream};
+use futures::{StreamExt, TryStreamExt};
 use blackhole::rocksdb;
 use blackhole::DbInterface;
 use bytes::Bytes;
+use arrow::array::{Int32Array, ListArray, RecordBatch, StringArray, StructArray, UInt8Array};
+use arrow::ipc::reader::StreamReader;
+use arrow::datatypes::{DataType, Field, Schema};
 
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
@@ -63,27 +67,31 @@ impl FlightService for FlightDbServer {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner();
         
-        let result = self.db.get(&ticket.ticket)
-            .map_err(|e| Status::internal(e.to_string()))?;
-        
+        // let result = self.db.get(&ticket.ticket)
+            // .map_err(|e| Status::internal(e.to_string()))?;
+        let result = Some(vec![1, 2, 3, 4, 5]);
+
         match result {
             Some(value) => {
-                let flight_data = FlightData {
-                    flight_descriptor: Some(FlightDescriptor {
-                        r#type: 0,
-                        cmd: Bytes::from(vec![]),
-                        path: vec![]
-                    }),
-                    data_header: Bytes::new(),
-                    data_body: Bytes::from(value),
-                    app_metadata: Bytes::new()
-                };
-
-                let output = futures::stream::once(async move {
-                    Ok(flight_data)
-                });
-
-                Ok(Response::new(Box::pin(output)))
+                // Create an Arrow record batch or array
+                let schema = Arc::new(Schema::new(vec![
+                    Field::new("e1", DataType::UInt8, false)
+                ]));
+                
+                // Create an array from our bytes
+                let array = UInt8Array::from(value);
+                
+                // Create a record batch
+                let batch = RecordBatch::try_new(
+                    schema.clone(),
+                    vec![std::sync::Arc::new(array)]
+                ).map_err(|e| Status::internal(e.to_string()))?;
+                
+                let stream = stream::iter(vec![batch]).map(Ok);
+                let fd = FlightDataEncoderBuilder::new()
+                .with_schema(schema).build(stream)
+                .map_err(|e| Status::internal(e.to_string()));
+                Ok(Response::new(Box::pin(fd)))
             }
             None => Err(Status::not_found("Key not found in database")),
         }
@@ -129,6 +137,7 @@ impl FlightService for FlightDbServer {
         unimplemented!()
     }
 }
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
