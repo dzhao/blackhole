@@ -6,7 +6,7 @@ class FlightClient:
     def __init__(self, host="localhost", port=50051):
         self.client = flight.connect(f"grpc://{host}:{port}")
     
-    def get_data(self, features: list[str], ids: list[str], start_ts: int, end_ts: int):
+    def get_data(self, ids: list[str], features: list[str], start_ts: int, end_ts: int):
         """
         Retrieve data using a ticket containing two string lists and two scalar timestamps
         """
@@ -43,8 +43,8 @@ def main():
         # Example: Get data for a key
         key = "test_key"
         reader = client.get_data(
-            ["f1", "f2"], 
             ["key01", "key02"], 
+            ["f1", "f2"], 
             1,  # start timestamp (scalar)
             None   # end timestamp (scalar)
         )

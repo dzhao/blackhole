@@ -5,20 +5,21 @@ use std::{ops::Deref, pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
 use futures::{stream::{self, BoxStream}, Stream};
 use futures::{StreamExt, TryStreamExt};
-use blackhole::rocksdb;
+use blackhole::{rocksdb, DatabaseType};
 use blackhole::DbInterface;
 use bytes::Bytes;
 use arrow::array::{Int32Array, ListArray, RecordBatch, StringArray, StructArray, UInt8Array};
 use arrow::ipc::reader::StreamReader;
 use arrow::datatypes::{DataType, Field, Schema};
 
+
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
 }
 
 impl FlightDbServer {
-    pub fn new(db: Box<dyn DbInterface>) -> Self {
-        Self { db }
+    pub fn new(db_type: DatabaseType) -> Self {
+        Self { db: db_type.create_db() }
     }
 
     fn decode_ticket(&self, ticket: &[u8]) -> Result<(Vec<String>, Vec<String>, i32, i32), Status> {
@@ -219,9 +220,7 @@ impl FlightService for FlightDbServer {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Flight server...");
     
-    // let db = rocksdb::open_rocks_readonly();
-    let db = blackhole::lmdb::setup_lmdb();
-    let server = FlightDbServer::new(db);
+    let server = FlightDbServer::new(DatabaseType::RocksDB);
     
     let addr = "[::1]:50051".parse().unwrap();
     tonic::transport::Server::builder()

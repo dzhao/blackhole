@@ -1,6 +1,19 @@
 pub mod lmdb;
 pub mod rocksdb;
 pub mod common;
+pub enum DatabaseType {
+    RocksDB,
+    LMDB,
+}
+
+impl DatabaseType {
+    pub fn create_db(&self) -> Box<dyn DbInterface> {
+        match self {
+            DatabaseType::RocksDB => rocksdb::open_rocks_readonly(),
+            DatabaseType::LMDB => lmdb::setup_lmdb(),
+        }
+    }
+}
 pub trait DbInterface: Send + Sync {
     fn db_type(&self) -> String;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
