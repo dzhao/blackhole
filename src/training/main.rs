@@ -8,7 +8,7 @@ use futures::{StreamExt, TryStreamExt};
 use blackhole::{rocksdb, DatabaseType};
 use blackhole::DbInterface;
 use bytes::Bytes;
-use arrow::array::{Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray, UInt8Array};
+use arrow::array::{Array, Float32Array, Int16Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray, UInt8Array};
 use arrow::ipc::reader::StreamReader;
 use arrow::datatypes::{DataType, Field, Schema};
 
@@ -22,7 +22,7 @@ impl FlightDbServer {
         Self { db: db_type.create_db() }
     }
 
-    fn decode_ticket(&self, ticket: &[u8]) -> Result<(Vec<(String, Option<i32>, Option<i32>)>, Vec<String>), Status> {
+    fn decode_ticket(&self, ticket: &[u8]) -> Result<(Vec<String>, Vec<(String, Option<i16>, Option<i16>)>), Status> {
         // Create a stream reader
         let mut reader = StreamReader::try_new(ticket, None)
             .map_err(|e| Status::internal(format!("Failed to create reader: {}", e)))?;
@@ -82,17 +82,17 @@ impl FlightDbServer {
             .column_by_name("start")
             .ok_or_else(|| Status::internal("start field not found"))?
             .as_any()
-            .downcast_ref::<Int32Array>()
+            .downcast_ref::<Int16Array>()
             .ok_or_else(|| Status::internal("Failed to downcast start to Int32Array"))?;
 
         let ends = features_struct
             .column_by_name("end")
             .ok_or_else(|| Status::internal("end field not found"))?
             .as_any()
-            .downcast_ref::<Int32Array>()
+            .downcast_ref::<Int16Array>()
             .ok_or_else(|| Status::internal("Failed to downcast end to Int32Array"))?;
 
-        let features: Vec<(String, Option<i32>, Option<i32>)> = (0..names.len())
+        let features: Vec<(String, Option<i16>, Option<i16>)> = (0..names.len())
             .map(|i| {
                 (
                     names.value(i).to_string(),
@@ -102,7 +102,7 @@ impl FlightDbServer {
             })
             .collect();
 
-        Ok((features, ids))
+        Ok((ids, features))
     }
 }
 #[tonic::async_trait]
@@ -150,39 +150,46 @@ impl FlightService for FlightDbServer {
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner().ticket;
-        let (features, ids) = self.decode_ticket(&ticket)?;
+        let (ids, features) = self.decode_ticket(&ticket)?;
+        assert_eq!(features.len(), 1);
+        let (feature_name, start, end) = &features[0];
 
         println!("Features: {:?}", features);
         println!("IDs: {:?}", ids);
         
-        // let result = self.db.get(&ticket.ticket)
-            // .map_err(|e| Status::internal(e.to_string()))?;
-        let result = Some(vec![1, 2, 3, 4, 5]);
-
-        match result {
-            Some(value) => {
-                // Create an Arrow record batch or array
-                let schema = Arc::new(Schema::new(vec![
-                    Field::new("e1", DataType::UInt8, false)
-                ]));
-                
-                // Create an array from our bytes
-                let array = UInt8Array::from(value);
-                
-                // Create a record batch
-                let batch = RecordBatch::try_new(
-                    schema.clone(),
-                    vec![std::sync::Arc::new(array)]
-                ).map_err(|e| Status::internal(e.to_string()))?;
-                
-                let stream = stream::iter(vec![batch]).map(Ok);
-                let fd = FlightDataEncoderBuilder::new()
-                .with_schema(schema).build(stream)
-                .map_err(|e| Status::internal(e.to_string()));
-                Ok(Response::new(Box::pin(fd)))
-            }
-            None => Err(Status::not_found("Key not found in database")),
+        // Collect all values for each ID using prefix seek
+        let mut all_values = Vec::new();
+        for id in ids {
+            // Construct the prefix key: "{id}:{feature_name}"
+            // let prefix = format!("{}:{}", id, feature_name);
+            
+            // Use prefix seek to get all matching values
+            let values = self.db.prefix_seek(&id, start.unwrap() as u16, end.unwrap() as u16)
+                .map_err(|e| Status::internal(e.to_string()))?;
+            
+            all_values.extend(values);
         }
+
+        if all_values.is_empty() {
+            return Err(Status::not_found("No matching data found in database"));
+        }
+
+        // Create an Arrow record batch or array
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("e1", DataType::Float32, false)
+        ]));
+        
+        let array = Float32Array::from(all_values);
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![std::sync::Arc::new(array)]
+        ).map_err(|e| Status::internal(e.to_string()))?;
+        
+        let stream = stream::iter(vec![batch]).map(Ok);
+        let fd = FlightDataEncoderBuilder::new()
+            .with_schema(schema).build(stream)
+            .map_err(|e| Status::internal(e.to_string()));
+        Ok(Response::new(Box::pin(fd)))
     }
 
     async fn do_put(

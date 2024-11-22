@@ -41,6 +41,10 @@ impl DbInterface for LmdbWrapper {
         println!("Closing LMDB environment, stats: {}, {}, {}", stat.page_size(), stat.depth(), stat.leaf_pages());
         Ok(())
     }
+    
+    fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        todo!()
+    }
 }
 
 pub fn setup_lmdb() -> Box<dyn DbInterface> {

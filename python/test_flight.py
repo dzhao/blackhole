@@ -1,3 +1,4 @@
+import json
 import pyarrow as pa
 import pyarrow.flight as flight
 import base64
@@ -13,8 +14,8 @@ class FlightClient:
         # Create arrays
         features_array = pa.array([features], type=pa.list_(pa.struct([
             ('name', pa.string()),
-            ('start', pa.int32()),
-            ('end', pa.int32())
+            ('start', pa.int16()),
+            ('end', pa.int16())
         ])))
         ids_array = pa.array([ids], type=pa.list_(pa.string()))
         
@@ -38,6 +39,10 @@ class FlightClient:
         return self.client.do_get(ticket)
 
 def main():
+    #load the sample data
+    with open("test.db/sample_data.json", "r") as f:
+        sample_data = json.load(f)
+    
     # Create a client
     client = FlightClient()
     
@@ -45,12 +50,13 @@ def main():
         # Example: Get data for a key
         key = "test_key"
         reader = client.get_data(
-            ["key01", "key02"], 
-            [("f1", 1, None), ("f2", None, None)],
+            ["user1", "user3"], 
+            [("embeddings", 1, 3)],
         )
         
         # Read all batches from the stream
         for batch in reader:
+            breakpoint()
             print(f"Retrieved batch: {batch}")
             # If you need to process specific columns:
             # column = batch.column('column_name')

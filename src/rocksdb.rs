@@ -1,4 +1,5 @@
-use rocksdb::{Options, SliceTransform, DB};
+use rocksdb::{Direction, IteratorMode, Options, SliceTransform, DB};
+use tonic::metadata::KeyAndMutValueRef;
 use crate::DbInterface;
 
 pub struct RocksDbWrapper(DB);
@@ -29,6 +30,21 @@ impl DbInterface for RocksDbWrapper {
     fn close(&self) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
+
+    fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+        let mut values = Vec::new();
+        let iter = self.0.iterator(
+            IteratorMode::From(self.encode(prefix, start_ts).as_bytes(), Direction::Forward));
+        for item in iter {
+            let (key, value) = item?;
+            if &*key > self.encode(prefix, end_ts).as_bytes() {
+                break;
+            }
+            values.extend_from_slice(&self.numpy_f32_vec(&value));
+        }
+        Ok(values)
+    }
+
 }
 
 pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
@@ -36,7 +52,8 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     //minimize background jobs since we are only reading
     opts.set_max_background_jobs(0);
     opts.set_max_write_buffer_number(0);
-    Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_bench").unwrap()))
+    // opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
+    Box::new(RocksDbWrapper(DB::open(&opts, "./test.db").unwrap()))
 }
 
 pub fn setup_rocks() -> Box<dyn DbInterface> {
