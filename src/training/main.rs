@@ -153,12 +153,15 @@ impl FlightService for FlightDbServer {
         let (ids, features) = self.decode_ticket(&ticket)?;
         assert_eq!(features.len(), 1);
         let (feature_name, start, end) = &features[0];
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(feature_name, DataType::Float32, false)
+        ]));
 
         println!("Features: {:?}", features);
         println!("IDs: {:?}", ids);
         
         // Collect all values for each ID using prefix seek
-        let mut all_values = Vec::new();
+        let mut batches = Vec::new();
         for id in ids {
             // Construct the prefix key: "{id}:{feature_name}"
             // let prefix = format!("{}:{}", id, feature_name);
@@ -167,25 +170,20 @@ impl FlightService for FlightDbServer {
             let values = self.db.prefix_seek(&id, start.unwrap() as u16, end.unwrap() as u16)
                 .map_err(|e| Status::internal(e.to_string()))?;
             
-            all_values.extend(values);
+            if values.is_empty() {
+                return Err(Status::not_found("No matching data found in database"));
+            }
+
+            let array = Float32Array::from(values);
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![std::sync::Arc::new(array)]
+            ).map_err(|e| Status::internal(e.to_string()))?;
+        
+            batches.push(batch);
         }
 
-        if all_values.is_empty() {
-            return Err(Status::not_found("No matching data found in database"));
-        }
-
-        // Create an Arrow record batch or array
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("e1", DataType::Float32, false)
-        ]));
-        
-        let array = Float32Array::from(all_values);
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![std::sync::Arc::new(array)]
-        ).map_err(|e| Status::internal(e.to_string()))?;
-        
-        let stream = stream::iter(vec![batch]).map(Ok);
+        let stream = stream::iter(batches).map(Ok);
         let fd = FlightDataEncoderBuilder::new()
             .with_schema(schema).build(stream)
             .map_err(|e| Status::internal(e.to_string()));

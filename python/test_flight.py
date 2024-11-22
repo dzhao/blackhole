@@ -49,15 +49,25 @@ def main():
     try:
         # Example: Get data for a key
         key = "test_key"
+        ids = ["user1", "user3"]
+        features = [("embeddings", 1, 3)]
+        feature, st, end = features[0]
         reader = client.get_data(
-            ["user1", "user3"], 
-            [("embeddings", 1, 3)],
+            ids, 
+            features,
         )
         
         # Read all batches from the stream
+        idx = 0
         for batch in reader:
-            breakpoint()
-            print(f"Retrieved batch: {batch}")
+            golden_data = sample_data[ids[idx]][st:end+1]
+            #flatten
+            golden_data = [e for l in golden_data for e in l]
+            # breakpoint()
+            retrieved_data = batch.data[feature].to_pylist()
+            assert golden_data == retrieved_data
+            idx += 1
+
             # If you need to process specific columns:
             # column = batch.column('column_name')
             
