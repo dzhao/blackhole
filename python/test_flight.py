@@ -6,20 +6,22 @@ class FlightClient:
     def __init__(self, host="localhost", port=50051):
         self.client = flight.connect(f"grpc://{host}:{port}")
     
-    def get_data(self, ids: list[str], features: list[str], start_ts: int, end_ts: int):
+    def get_data(self, ids: list[str], features: list[tuple]):
         """
-        Retrieve data using a ticket containing two string lists and two scalar timestamps
+        Retrieve data using a ticket containing feature tuples (name, start, end) and two scalar timestamps
         """
         # Create arrays
-        features_array = pa.array([features], type=pa.list_(pa.string()))
+        features_array = pa.array([features], type=pa.list_(pa.struct([
+            ('name', pa.string()),
+            ('start', pa.int32()),
+            ('end', pa.int32())
+        ])))
         ids_array = pa.array([ids], type=pa.list_(pa.string()))
-        start_ts_array = pa.array([start_ts], type=pa.int32())
-        end_ts_array = pa.array([end_ts], type=pa.int32())
         
         # Create struct array with proper types
         struct_array = pa.StructArray.from_arrays(
-            [features_array, ids_array, start_ts_array, end_ts_array],
-            ['features', 'ids', 'start_ts', 'end_ts']
+            [ids_array, features_array],
+            ['ids', 'features']
         )
         
         # Create a record batch with a single row (our struct)
@@ -44,9 +46,7 @@ def main():
         key = "test_key"
         reader = client.get_data(
             ["key01", "key02"], 
-            ["f1", "f2"], 
-            1,  # start timestamp (scalar)
-            None   # end timestamp (scalar)
+            [("f1", 1, None), ("f2", None, None)],
         )
         
         # Read all batches from the stream
