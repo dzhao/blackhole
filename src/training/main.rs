@@ -219,7 +219,8 @@ impl FlightService for FlightDbServer {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Flight server...");
     
-    let db = rocksdb::setup_rocks();
+    // let db = rocksdb::open_rocks_readonly();
+    let db = blackhole::lmdb::setup_lmdb();
     let server = FlightDbServer::new(db);
     
     let addr = "[::1]:50051".parse().unwrap();

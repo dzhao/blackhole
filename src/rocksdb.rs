@@ -31,6 +31,13 @@ impl DbInterface for RocksDbWrapper {
     }
 }
 
+pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
+    let mut opts = Options::default();
+    //minimize background jobs since we are only reading
+    opts.set_max_background_jobs(1);
+    Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_bench").unwrap()))
+}
+
 pub fn setup_rocks() -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     opts.create_if_missing(true);

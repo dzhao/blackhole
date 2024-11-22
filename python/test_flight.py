@@ -46,7 +46,7 @@ def main():
             ["f1", "f2"], 
             ["key01", "key02"], 
             1,  # start timestamp (scalar)
-            2   # end timestamp (scalar)
+            None   # end timestamp (scalar)
         )
         
         # Read all batches from the stream
