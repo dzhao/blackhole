@@ -20,6 +20,77 @@ impl FlightDbServer {
     pub fn new(db: Box<dyn DbInterface>) -> Self {
         Self { db }
     }
+
+    fn decode_ticket(&self, ticket: &[u8]) -> Result<(Vec<String>, Vec<String>, i32, i32), Status> {
+        // Create a stream reader
+        let mut reader = StreamReader::try_new(ticket, None)
+            .map_err(|e| Status::internal(format!("Failed to create reader: {}", e)))?;
+        
+        // Read the first (and only) batch
+        let batch = reader
+            .next()
+            .ok_or_else(|| Status::internal("No record batch found"))?
+            .map_err(|e| Status::internal(format!("Failed to read batch: {}", e)))?;
+
+        // Get the struct array (first column)
+        let struct_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StructArray>()
+            .ok_or_else(|| Status::internal("Failed to downcast to StructArray"))?;
+
+        // Extract the fields
+        let features_list = struct_array
+            .column_by_name("features")
+            .ok_or_else(|| Status::internal("features field not found"))?
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or_else(|| Status::internal("Failed to downcast features to ListArray"))?;
+
+        let ids_list = struct_array
+            .column_by_name("ids")
+            .ok_or_else(|| Status::internal("ids field not found"))?
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or_else(|| Status::internal("Failed to downcast ids to ListArray"))?;
+
+        let start_ts = struct_array
+            .column_by_name("start_ts")
+            .ok_or_else(|| Status::internal("start_ts field not found"))?
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .ok_or_else(|| Status::internal("Failed to downcast start_ts to Int32Array"))?
+            .value(0);
+
+        let end_ts = struct_array
+            .column_by_name("end_ts")
+            .ok_or_else(|| Status::internal("end_ts field not found"))?
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .ok_or_else(|| Status::internal("Failed to downcast end_ts to Int32Array"))?
+            .value(0);
+
+        // Convert lists to Vecs
+        let features = features_list
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| Status::internal("Failed to downcast features values to StringArray"))?
+            .iter()
+            .map(|s| s.unwrap_or_default().to_string())
+            .collect();
+
+        let ids = ids_list
+            .values()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| Status::internal("Failed to downcast ids values to StringArray"))?
+            .iter()
+            .map(|s| s.unwrap_or_default().to_string())
+            .collect();
+
+        Ok((features, ids, start_ts, end_ts))
+    }
 }
 #[tonic::async_trait]
 impl FlightService for FlightDbServer {
@@ -65,61 +136,13 @@ impl FlightService for FlightDbServer {
         &self,
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
-        use arrow::array::{StructArray, ListArray, StringArray, Int32Array};
-        use arrow::ipc::reader::StreamReader;
-
-        // Assuming `ticket_bytes` is the bytes from the Flight ticket
         let ticket = request.into_inner().ticket;
-        let mut reader = StreamReader::try_new(ticket.deref(), None)
-            .map_err(|e| Status::internal(e.to_string()))?;
-        let batch = reader.next()
-            .unwrap()
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let (features, ids, start_ts, end_ts) = self.decode_ticket(&ticket)?;
 
-        // Get the struct array
-        let struct_array = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<StructArray>()
-            .unwrap();
-
-// Extract the list arrays
-        let feature_list = struct_array
-            .column(0)
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .unwrap();
-        let id_list = struct_array
-            .column(1)
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .unwrap();
-        let ts_list = struct_array
-            .column(2)
-            .as_any()
-            .downcast_ref::<ListArray>()
-            .unwrap();
-
-        // Get the values
-        let features = feature_list
-            .values()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        let ids = id_list
-            .values()
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        let tses = ts_list
-            .values()
-            .as_any()
-            .downcast_ref::<Int32Array>()
-            .unwrap();
-
-        for f in features {
-            println!("{}", f.unwrap());
-        } 
+        println!("Features: {:?}", features);
+        println!("IDs: {:?}", ids);
+        println!("Time range: {} to {}", start_ts, end_ts);
+        
         // let result = self.db.get(&ticket.ticket)
             // .map_err(|e| Status::internal(e.to_string()))?;
         let result = Some(vec![1, 2, 3, 4, 5]);
