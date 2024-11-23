@@ -63,7 +63,6 @@ def main():
             golden_data = sample_data[ids[idx]][st:end+1]
             #flatten
             golden_data = [e for l in golden_data for e in l]
-            # breakpoint()
             retrieved_data = batch.data[feature].to_pylist()
             assert golden_data == retrieved_data
             idx += 1

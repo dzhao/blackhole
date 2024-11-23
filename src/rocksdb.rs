@@ -1,4 +1,4 @@
-use rocksdb::{Direction, IteratorMode, Options, SliceTransform, DB};
+use rocksdb::{Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, DB};
 use tonic::metadata::KeyAndMutValueRef;
 use crate::DbInterface;
 
@@ -52,7 +52,18 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     //minimize background jobs since we are only reading
     opts.set_max_background_jobs(0);
     opts.set_max_write_buffer_number(0);
-    // opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
+    let factory_opts = PlainTableFactoryOptions {
+        user_key_length: 0,
+        bloom_bits_per_key: 20,
+        hash_table_ratio: 0.75,
+        index_sparseness: 16,
+        huge_page_tlb_size: 0,
+        encoding_type: KeyEncodingType::Plain,
+        full_scan_mode: false,
+        store_index_in_file: false,
+    };
+    opts.set_plain_table_factory(&factory_opts);
+    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
     Box::new(RocksDbWrapper(DB::open(&opts, "./test.db").unwrap()))
 }
 
