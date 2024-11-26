@@ -33,10 +33,15 @@ public class RocksDBSSTReader {
         }
         String sstFilePath = args[0];
         System.out.println("Reading SST file: " + sstFilePath);
-        try (Options options = new Options();
+        Options options = new Options();
+        PlainTableConfig config = new PlainTableConfig();
+        options.setTableFormatConfig(config);
+        try (
              ReadOptions readOptions = new ReadOptions();
              SstFileReader reader = new SstFileReader(options)) {
 
+            // Configure options for plain format
+            
             // Open the SST file
             reader.open(sstFilePath);
 
