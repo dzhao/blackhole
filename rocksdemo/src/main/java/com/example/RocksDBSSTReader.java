@@ -34,8 +34,12 @@ public class RocksDBSSTReader {
         String sstFilePath = args[0];
         System.out.println("Reading SST file: " + sstFilePath);
         Options options = new Options();
+        options.useCappedPrefixExtractor(64);
         PlainTableConfig config = new PlainTableConfig();
+        // Add prefix extractor (for example, using fixed prefix length of 4)
+
         options.setTableFormatConfig(config);
+        
         try (
              ReadOptions readOptions = new ReadOptions();
              SstFileReader reader = new SstFileReader(options)) {
