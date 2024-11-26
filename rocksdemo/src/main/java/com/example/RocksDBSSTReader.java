@@ -25,7 +25,7 @@ public class RocksDBSSTReader {
 
     public static void main(String[] args) {
         System.out.println("Program started");
-        
+
         if (args.length < 1) {
             System.out.println("No arguments provided");
             System.err.println("Usage: RocksDBSSTReader <sst-file-path>");
@@ -39,30 +39,32 @@ public class RocksDBSSTReader {
         // Add prefix extractor (for example, using fixed prefix length of 4)
 
         options.setTableFormatConfig(config);
-        
+
+        int count = 0;
         try (
-             ReadOptions readOptions = new ReadOptions();
-             SstFileReader reader = new SstFileReader(options)) {
+                ReadOptions readOptions = new ReadOptions();
+                SstFileReader reader = new SstFileReader(options)) {
 
             // Configure options for plain format
-            
+
             // Open the SST file
             reader.open(sstFilePath);
 
             // Get an iterator for the SST file
             SstFileReaderIterator iterator = reader.newIterator(readOptions);
-            
+
             // Iterate through all key-value pairs
             iterator.seekToFirst();
+            count = 0;
             while (iterator.isValid()) {
                 byte[] key = iterator.key();
                 byte[] value = iterator.value();
-                
+
                 // Print key-value pairs (assuming UTF-8 encoding)
-                System.out.printf("Key: %s, Value: %s%n",
-                    new String(key),
-                    new String(value));
-                
+//                System.out.printf("Key: %s, Value: %s%n",
+//                    new String(key),
+//                    new String(value));
+                count++;
                 iterator.next();
             }
 
@@ -70,5 +72,6 @@ public class RocksDBSSTReader {
             System.err.println("Error reading SST file: " + e.getMessage());
             e.printStackTrace();
         }
+        System.out.println(count);
     }
 }
