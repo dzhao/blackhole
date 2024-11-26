@@ -157,8 +157,8 @@ impl FlightService for FlightDbServer {
             Field::new(feature_name, DataType::Float32, false)
         ]));
 
-        println!("Features: {:?}", features);
-        println!("IDs: {:?}", ids);
+        // println!("Features: {:?}", features);
+        // println!("IDs: {:?}", ids);
         
         // Collect all values for each ID using prefix seek
         let mut batches = Vec::new();
