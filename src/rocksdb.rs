@@ -47,6 +47,26 @@ impl DbInterface for RocksDbWrapper {
 
 }
 
+// Add this struct and implementation before the open_rocks_readonly function
+/* 
+struct CustomPrefixTransform;
+
+impl SliceTransform for CustomPrefixTransform {
+    fn transform<'a>(&self, key: &'a [u8]) -> &'a [u8] {
+        let prefix_len = std::cmp::min(key.len(), 64);
+        &key[..prefix_len]
+    }
+
+    fn in_domain(&self, key: &[u8]) -> bool {
+        !key.is_empty()
+    }
+
+    fn in_range(&self, _: &[u8]) -> bool {
+        true
+    }
+}
+*/
+
 pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     //minimize background jobs since we are only reading
