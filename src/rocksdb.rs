@@ -1,5 +1,4 @@
 use rocksdb::{Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, DB};
-use tonic::metadata::KeyAndMutValueRef;
 use crate::DbInterface;
 
 pub struct RocksDbWrapper(DB);
