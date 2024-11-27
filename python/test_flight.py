@@ -7,6 +7,8 @@ import numpy as np
 import tensorflow as tf
 import argparse
 import time
+import psutil
+import os
 
 def main():
     # Add argument parser
@@ -16,6 +18,13 @@ def main():
     parser.add_argument('--perf_test', action='store_true',
                        help='Enable performance testing')
     args = parser.parse_args()
+
+    # Initialize performance monitoring
+    process = psutil.Process(os.getpid())
+    has_io_counters = hasattr(process, 'io_counters')
+    if has_io_counters:
+        initial_io = process.io_counters()
+    start_time = time.time()
 
     # Update file path to use command line argument
     with open(f"{args.db_path}/sample_data.json", "r") as f:
@@ -54,7 +63,21 @@ def main():
             cnt +=1
             if cnt % 1000 == 0:
                 dur = time.time() - test_start
-                print(f"Processed {cnt} requests in {dur:.3f} seconds, qps: {cnt/dur:.3f}, vectors/s:{cnt*batch_size/dur:.3f}")
+                cpu_percent = process.cpu_percent()
+                
+                print(f"Performance Metrics:")
+                print(f"- Processed {cnt} requests in {dur:.3f} seconds")
+                print(f"- QPS: {cnt/dur:.3f}")
+                print(f"- Vectors/s: {cnt*batch_size/dur:.3f}")
+                print(f"- CPU Usage: {cpu_percent:.1f}%")
+                
+                # Only show I/O metrics if available
+                if has_io_counters:
+                    current_io = process.io_counters()
+                    io_read_rate = (current_io.read_bytes - initial_io.read_bytes) / dur / 1024 / 1024  # MB/s
+                    io_write_rate = (current_io.write_bytes - initial_io.write_bytes) / dur / 1024 / 1024  # MB/s
+                    print(f"- I/O Read Rate: {io_read_rate:.2f} MB/s")
+                    print(f"- I/O Write Rate: {io_write_rate:.2f} MB/s")
     except flight.FlightUnavailableError:
         print("Could not connect to Flight server")
     except Exception as e:
