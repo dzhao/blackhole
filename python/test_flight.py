@@ -40,7 +40,7 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 2, 3), ("f1", 2, 3), ("f2", 2, 3)]
+            features = [("", 2, 3), ("f1", 2, 3), ("f2", 1, 3)]
             # feature, st, end = features[0]
             reader = client.get_data(
                 ids, 
@@ -48,17 +48,21 @@ def main():
             )
         
         # Read all batches from the stream
+            offset = 0
             batch = next(reader)
             for idx in range(batch_size):
+                if idx == offset+len(batch.data):
+                    offset += len(batch.data)
+                    batch = next(reader)
                 for feature, st, end in features:
                     if not args.perf_test:
                         golden_data = sample_data[ids[idx]][st:end+1]
                         #flatten
                         golden_data = [e for l in golden_data for e in l]
-                        retrieved_data = batch.data[feature][idx].values.to_pylist()
+                        retrieved_data = batch.data[feature][idx-offset].values.to_pylist()
                         assert golden_data == retrieved_data
                     else:
-                        nump_data = batch.data[feature][idx].values.to_numpy(zero_copy_only=True)
+                        nump_data = batch.data[feature][idx-offset].values.to_numpy(zero_copy_only=True)
                         tf_tensor = tf.convert_to_tensor(nump_data)
                 idx += 1
             cnt +=1
@@ -81,8 +85,6 @@ def main():
                     print(f"- I/O Write Rate: {io_write_rate:.2f} MB/s")
     except flight.FlightUnavailableError:
         print("Could not connect to Flight server")
-    except Exception as e:
-        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
