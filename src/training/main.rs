@@ -152,10 +152,10 @@ impl FlightService for FlightDbServer {
         let ticket = request.into_inner().ticket;
         let (ids, features) = self.decode_ticket(&ticket)?;
         assert_eq!(features.len(), 1);
-        let (feature_name, start, end) = &features[0];
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(feature_name, DataType::Float32, false)
-        ]));
+        // let (feature_name, start, end) = &features[0];
+        let schema = Arc::new(Schema::new(
+            features.iter().map(|(feature_name, _, _)| Field::new(feature_name, DataType::Float32, false)).collect::<Vec<Field>>()
+        ));
 
         println!("Features: {:?}", features);
         println!("IDs: {:?}", ids);
@@ -163,10 +163,8 @@ impl FlightService for FlightDbServer {
         // Collect all values for each ID using prefix seek
         let mut batches = Vec::new();
         for id in ids {
-            // Construct the prefix key: "{id}:{feature_name}"
-            // let prefix = format!("{}:{}", id, feature_name);
-            
-            // Use prefix seek to get all matching values
+            let mut arrays = Vec::new();
+            for (_, start, end) in &features {
             let values = self.db.prefix_seek(&id, start.unwrap() as u16, end.unwrap() as u16)
                 .map_err(|e| Status::internal(e.to_string()))?;
             
@@ -174,10 +172,11 @@ impl FlightService for FlightDbServer {
                 return Err(Status::not_found("No matching data found in database"));
             }
 
-            let array = Float32Array::from(values);
+            arrays.push(std::sync::Arc::new(Float32Array::from(values)) as Arc<dyn Array>);
+        }
             let batch = RecordBatch::try_new(
                 schema.clone(),
-                vec![std::sync::Arc::new(array)]
+                arrays,
             ).map_err(|e| Status::internal(e.to_string()))?;
         
             batches.push(batch);
