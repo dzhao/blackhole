@@ -40,7 +40,7 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 2, 3), ("f1", 2, 3), ("f2", 1, 3)]
+            features = [("", 2, 3)] #, ("f1", 2, 8), ("f2", 1, 10)]
             # feature, st, end = features[0]
             reader = client.get_data(
                 ids, 
@@ -63,26 +63,29 @@ def main():
                         assert golden_data == retrieved_data
                     else:
                         nump_data = batch.data[feature][idx-offset].values.to_numpy(zero_copy_only=True)
+                        assert nump_data.base is not None
                         tf_tensor = tf.convert_to_tensor(nump_data)
                 idx += 1
             cnt +=1
-            if args.perf_test and cnt % 1000 == 0:
-                dur = time.time() - test_start
-                cpu_percent = process.cpu_percent()
+            if cnt % 1000 == 0:
+                print(f"Processed {cnt} requests")
+                if args.perf_test:
+                    dur = time.time() - test_start
+                    cpu_percent = process.cpu_percent()
+                    
+                    print(f"Performance Metrics:")
+                    print(f"- Processed {cnt} requests in {dur:.3f} seconds")
+                    print(f"- QPS: {cnt/dur:.3f}")
+                    print(f"- Vectors/s: {cnt*batch_size*sum(e-s+1 for f, s,e in features)/dur:.3f}")
+                    print(f"- CPU Usage: {cpu_percent:.1f}%")
                 
-                print(f"Performance Metrics:")
-                print(f"- Processed {cnt} requests in {dur:.3f} seconds")
-                print(f"- QPS: {cnt/dur:.3f}")
-                print(f"- Vectors/s: {cnt*batch_size*sum(e-s+1 for f, s,e in features)/dur:.3f}")
-                print(f"- CPU Usage: {cpu_percent:.1f}%")
-                
-                # Only show I/O metrics if available
-                if has_io_counters:
-                    current_io = process.io_counters()
-                    io_read_rate = (current_io.read_bytes - initial_io.read_bytes) / dur / 1024 / 1024  # MB/s
-                    io_write_rate = (current_io.write_bytes - initial_io.write_bytes) / dur / 1024 / 1024  # MB/s
-                    print(f"- I/O Read Rate: {io_read_rate:.2f} MB/s")
-                    print(f"- I/O Write Rate: {io_write_rate:.2f} MB/s")
+                    # Only show I/O metrics if available
+                    if has_io_counters:
+                        current_io = process.io_counters()
+                        io_read_rate = (current_io.read_bytes - initial_io.read_bytes) / dur / 1024 / 1024  # MB/s
+                        io_write_rate = (current_io.write_bytes - initial_io.write_bytes) / dur / 1024 / 1024  # MB/s
+                        print(f"- I/O Read Rate: {io_read_rate:.2f} MB/s")
+                        print(f"- I/O Write Rate: {io_write_rate:.2f} MB/s")
     except flight.FlightUnavailableError:
         print("Could not connect to Flight server")
 

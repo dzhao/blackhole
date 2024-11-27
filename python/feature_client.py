@@ -18,9 +18,16 @@ class FeatureClient:
         ]
         self.client = flight.connect(location, generic_options=options)
     
-    def get_data(self, ids: list[str], features: list[tuple]):
+    def _encode_ticket(self, ids: list[str], features: list[tuple]) -> flight.Ticket:
         """
-        Retrieve data using a ticket containing feature tuples (name, start, end) and two scalar timestamps
+        Encode ids and features into a Flight ticket
+        
+        Args:
+            ids: List of string identifiers
+            features: List of feature tuples (name, start, end)
+            
+        Returns:
+            flight.Ticket: Encoded ticket ready for transport
         """
         # Create arrays
         ids_array = pa.array([ids], type=pa.list_(pa.string()))
@@ -45,6 +52,18 @@ class FeatureClient:
         writer.write_batch(batch)
         writer.close()
         
-        # Create ticket with the serialized data
-        ticket = flight.Ticket(sink.getvalue().to_pybytes())
+        return flight.Ticket(sink.getvalue().to_pybytes())
+
+    def get_data(self, ids: list[str], features: list[tuple]):
+        """
+        Retrieve data using a ticket containing feature tuples (name, start, end) and two scalar timestamps
+        
+        Example:
+            client = FeatureClient()
+            ids = ["id1", "id2"]
+            features = [("feature1", 0, 10), ("feature2", 5, 15)]
+            data = client.get_data(ids, features)
+            # Process the data as needed
+        """
+        ticket = self._encode_ticket(ids, features)
         return self.client.do_get(ticket) 
