@@ -164,16 +164,17 @@ impl FlightService for FlightDbServer {
         let mut batches = Vec::new();
         for id in ids {
             let mut arrays = Vec::new();
-            for (_, start, end) in &features {
-            let values = self.db.prefix_seek(&id, start.unwrap() as u16, end.unwrap() as u16)
-                .map_err(|e| Status::internal(e.to_string()))?;
+            for (feature_name, start, end) in &features {
+                let prefix = if feature_name.is_empty() { &id } else { &format!("{}.{}", id, feature_name) };
+                let values = self.db.prefix_seek(prefix, start.unwrap() as u16, end.unwrap() as u16)
+                    .map_err(|e| Status::internal(e.to_string()))?;
             
-            if values.is_empty() {
-                return Err(Status::not_found("No matching data found in database"));
-            }
+                if values.is_empty() {
+                    return Err(Status::not_found("No matching data found in database"));
+                }
 
-            arrays.push(std::sync::Arc::new(Float32Array::from(values)) as Arc<dyn Array>);
-        }
+                arrays.push(std::sync::Arc::new(Float32Array::from(values)) as Arc<dyn Array>);
+            }
             let batch = RecordBatch::try_new(
                 schema.clone(),
                 arrays,
