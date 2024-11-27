@@ -73,7 +73,7 @@ def main():
                 print(f"Performance Metrics:")
                 print(f"- Processed {cnt} requests in {dur:.3f} seconds")
                 print(f"- QPS: {cnt/dur:.3f}")
-                print(f"- Vectors/s: {cnt*batch_size/dur:.3f}")
+                print(f"- Vectors/s: {cnt*batch_size*sum(e-s+1 for f, s,e in features)/dur:.3f}")
                 print(f"- CPU Usage: {cpu_percent:.1f}%")
                 
                 # Only show I/O metrics if available
