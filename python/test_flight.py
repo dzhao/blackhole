@@ -40,28 +40,29 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 1, 3)]
-            feature, st, end = features[0]
+            features = [("", 2, 3), ("f1", 2, 3), ("f2", 2, 3)]
+            # feature, st, end = features[0]
             reader = client.get_data(
                 ids, 
                 features,
             )
         
         # Read all batches from the stream
-            idx = 0
-            for batch in reader:
-                if not args.perf_test:
-                    golden_data = sample_data[ids[idx]][st:end+1]
-                    #flatten
-                    golden_data = [e for l in golden_data for e in l]
-                    retrieved_data = batch.data[feature].to_pylist()
-                    assert golden_data == retrieved_data
-                else:
-                    nump_data = batch.data[feature].to_numpy()
-                    tf_tensor = tf.convert_to_tensor(nump_data)
+            batch = next(reader)
+            for idx in range(batch_size):
+                for feature, st, end in features:
+                    if not args.perf_test:
+                        golden_data = sample_data[ids[idx]][st:end+1]
+                        #flatten
+                        golden_data = [e for l in golden_data for e in l]
+                        retrieved_data = batch.data[feature][idx].values.to_pylist()
+                        assert golden_data == retrieved_data
+                    else:
+                        nump_data = batch.data[feature][idx].values.to_numpy(zero_copy_only=True)
+                        tf_tensor = tf.convert_to_tensor(nump_data)
                 idx += 1
             cnt +=1
-            if cnt % 1000 == 0:
+            if args.perf_test and cnt % 1000 == 0:
                 dur = time.time() - test_start
                 cpu_percent = process.cpu_percent()
                 

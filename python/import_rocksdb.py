@@ -34,13 +34,14 @@ def create_sample_data(db_path: str):
             for idx in np.random.permutation(range(num_embeddings)):
                 # Key format: "{id}:{feature_name}:{index}"
                 embedding = np.random.randn(dim).astype(np.float32)
-                key = f"{user_id}:{idx:04d}".encode()
-                # Use tobytes() directly instead of float_to_bytes
-                value = embedding.tobytes()
-                db[key] = value
-                ##only store first 100 users
-                if user_id_num < 10:
-                    output[user_id][idx] = embedding.tolist()
+                for feature_name in ["", "f1", "f2"]:
+                    prefix = user_id if feature_name == "" else f"{user_id}.{feature_name}"
+                    key = f"{prefix}:{idx:04d}".encode()
+                    # Use tobytes() directly instead of float_to_bytes
+                    value = embedding.tobytes()
+                    db[key] = value
+                    if user_id_num < 10:
+                        output[prefix][idx] = embedding.tolist()
                 
             if user_id_num % 100 == 0:
                 print(f"Added {num_embeddings} embeddings for {user_id}")

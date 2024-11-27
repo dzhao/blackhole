@@ -42,7 +42,7 @@ impl DbInterface for LmdbWrapper {
         Ok(())
     }
     
-    fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+    fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>> {
         todo!()
     }
 }

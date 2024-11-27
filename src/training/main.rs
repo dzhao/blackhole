@@ -1,17 +1,25 @@
-use arrow_flight::{
-    encode::FlightDataEncoderBuilder, flight_service_server::{FlightService, FlightServiceServer}, Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo, HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket
+use arrow::array::{
+    Array, Float32Array, Int16Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray,
+    UInt8Array,
 };
+use arrow::datatypes::{DataType, Field, Float32Type, Schema};
+use arrow::ipc::reader::StreamReader;
+use arrow_flight::{
+    encode::FlightDataEncoderBuilder,
+    flight_service_server::{FlightService, FlightServiceServer},
+    Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
+    HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
+};
+use blackhole::DbInterface;
+use blackhole::{rocksdb, DatabaseType};
+use bytes::Bytes;
+use futures::{
+    stream::{self, BoxStream},
+    Stream,
+};
+use futures::{StreamExt, TryStreamExt};
 use std::{ops::Deref, pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
-use futures::{stream::{self, BoxStream}, Stream};
-use futures::{StreamExt, TryStreamExt};
-use blackhole::{rocksdb, DatabaseType};
-use blackhole::DbInterface;
-use bytes::Bytes;
-use arrow::array::{Array, Float32Array, Int16Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray, UInt8Array};
-use arrow::ipc::reader::StreamReader;
-use arrow::datatypes::{DataType, Field, Schema};
-
 
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
@@ -19,14 +27,19 @@ pub struct FlightDbServer {
 
 impl FlightDbServer {
     pub fn new(db_type: DatabaseType) -> Self {
-        Self { db: db_type.create_db() }
+        Self {
+            db: db_type.create_db(),
+        }
     }
 
-    fn decode_ticket(&self, ticket: &[u8]) -> Result<(Vec<String>, Vec<(String, Option<i16>, Option<i16>)>), Status> {
+    fn decode_ticket(
+        &self,
+        ticket: &[u8],
+    ) -> Result<(Vec<String>, Vec<(String, Option<i16>, Option<i16>)>), Status> {
         // Create a stream reader
         let mut reader = StreamReader::try_new(ticket, None)
             .map_err(|e| Status::internal(format!("Failed to create reader: {}", e)))?;
-        
+
         // Read the first (and only) batch
         let batch = reader
             .next()
@@ -96,8 +109,16 @@ impl FlightDbServer {
             .map(|i| {
                 (
                     names.value(i).to_string(),
-                    if starts.is_null(i) { None } else { Some(starts.value(i)) },
-                    if ends.is_null(i) { None } else { Some(ends.value(i)) },
+                    if starts.is_null(i) {
+                        None
+                    } else {
+                        Some(starts.value(i))
+                    },
+                    if ends.is_null(i) {
+                        None
+                    } else {
+                        Some(ends.value(i))
+                    },
                 )
             })
             .collect();
@@ -112,7 +133,7 @@ impl FlightService for FlightDbServer {
     type DoGetStream = Pin<Box<dyn Stream<Item = Result<FlightData, Status>> + Send>>;
     type DoPutStream = Pin<Box<dyn Stream<Item = Result<PutResult, Status>> + Send>>;
     type DoExchangeStream = Pin<Box<dyn Stream<Item = Result<FlightData, Status>> + Send>>;
-    
+
     async fn get_schema(
         &self,
         _request: Request<FlightDescriptor>,
@@ -151,41 +172,53 @@ impl FlightService for FlightDbServer {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner().ticket;
         let (ids, features) = self.decode_ticket(&ticket)?;
-        assert_eq!(features.len(), 1);
-        // let (feature_name, start, end) = &features[0];
+        
+        // Create schema with List<Float32> type for each feature
         let schema = Arc::new(Schema::new(
-            features.iter().map(|(feature_name, _, _)| Field::new(feature_name, DataType::Float32, false)).collect::<Vec<Field>>()
+            features
+                .iter()
+                .map(|(feature_name, _, _)| {
+                    Field::new(
+                        feature_name,
+                        DataType::List(Arc::new(Field::new("item", DataType::Float32, true))),
+                        false,
+                    )
+                })
+                .collect::<Vec<Field>>(),
         ));
 
-        println!("Features: {:?}", features);
-        println!("IDs: {:?}", ids);
-        
-        // Collect all values for each ID using prefix seek
-        let mut batches = Vec::new();
+        let mut array_arrays = features.iter().map(|_| vec![]).collect::<Vec<_>>();
         for id in ids {
-            let mut arrays = Vec::new();
-            for (feature_name, start, end) in &features {
-                let prefix = if feature_name.is_empty() { &id } else { &format!("{}.{}", id, feature_name) };
-                let values = self.db.prefix_seek(prefix, start.unwrap() as u16, end.unwrap() as u16)
+            for (i, (feature_name, start, end)) in features.iter().enumerate() {
+                let prefix = if feature_name.is_empty() {
+                    &id
+                } else {
+                    &format!("{}.{}", id, feature_name)
+                };
+                let values = self
+                    .db
+                    .prefix_seek(prefix, start.unwrap() as u16, end.unwrap() as u16)
                     .map_err(|e| Status::internal(e.to_string()))?;
-            
+
                 if values.is_empty() {
                     return Err(Status::not_found("No matching data found in database"));
                 }
-
-                arrays.push(std::sync::Arc::new(Float32Array::from(values)) as Arc<dyn Array>);
+                array_arrays[i].push(Some(values));
+                
+                // Create a ListArray containing the Float32Array
+                // let list_array = ListArray::from_iter_primitive::<Float32Type, _, _>(
+                    // vec![Some(values)]
+                // );
+                // arrays.push(Arc::new(list_array) as Arc<dyn Array>);
             }
-            let batch = RecordBatch::try_new(
-                schema.clone(),
-                arrays,
-            ).map_err(|e| Status::internal(e.to_string()))?;
-        
-            batches.push(batch);
         }
-
-        let stream = stream::iter(batches).map(Ok);
+        let arrays = array_arrays.iter().map(|array| Arc::new(ListArray::from_iter_primitive::<Float32Type, _, _>(array.clone())) as Arc<dyn Array>).collect::<Vec<_>>();
+        let batch = RecordBatch::try_new(schema.clone(), arrays)
+                .map_err(|e| Status::internal(e.to_string()))?;
+        let stream = stream::iter(vec![batch]).map(Ok);
         let fd = FlightDataEncoderBuilder::new()
-            .with_schema(schema).build(stream)
+            .with_schema(schema)
+            .build(stream)
             .map_err(|e| Status::internal(e.to_string()));
         Ok(Response::new(Box::pin(fd)))
     }
@@ -231,18 +264,17 @@ impl FlightService for FlightDbServer {
     }
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Flight server...");
-    
+
     let server = FlightDbServer::new(DatabaseType::RocksDB);
-    
+
     let addr = "[::1]:50051".parse().unwrap();
     tonic::transport::Server::builder()
         .add_service(FlightServiceServer::new(server))
         .serve(addr)
         .await?;
-    
+
     Ok(())
-} 
+}
