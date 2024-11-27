@@ -40,7 +40,7 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 1, 3)]
+            features = [("", 2, 3), ("f1", 2, 3), ("f2", 2, 3)]
             feature, st, end = features[0]
             reader = client.get_data(
                 ids, 
@@ -60,6 +60,7 @@ def main():
                     nump_data = batch.data[feature].to_numpy()
                     tf_tensor = tf.convert_to_tensor(nump_data)
                 idx += 1
+            assert idx == batch_size
             cnt +=1
             if cnt % 1000 == 0:
                 dur = time.time() - test_start

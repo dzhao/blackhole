@@ -151,14 +151,14 @@ impl FlightService for FlightDbServer {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner().ticket;
         let (ids, features) = self.decode_ticket(&ticket)?;
-        assert_eq!(features.len(), 1);
+        // assert_eq!(features.len(), 1);
         // let (feature_name, start, end) = &features[0];
         let schema = Arc::new(Schema::new(
             features.iter().map(|(feature_name, _, _)| Field::new(feature_name, DataType::Float32, false)).collect::<Vec<Field>>()
         ));
 
-        println!("Features: {:?}", features);
-        println!("IDs: {:?}", ids);
+        // println!("Features: {:?}", features);
+        // println!("IDs: {:?}", ids);
         
         // Collect all values for each ID using prefix seek
         let mut batches = Vec::new();
