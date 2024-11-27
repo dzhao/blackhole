@@ -23,12 +23,12 @@ class FeatureClient:
         Retrieve data using a ticket containing feature tuples (name, start, end) and two scalar timestamps
         """
         # Create arrays
+        ids_array = pa.array([ids], type=pa.list_(pa.string()))
         features_array = pa.array([features], type=pa.list_(pa.struct([
             ('name', pa.string()),
             ('start', pa.int16()),
             ('end', pa.int16())
         ])))
-        ids_array = pa.array([ids], type=pa.list_(pa.string()))
         
         # Create struct array with proper types
         struct_array = pa.StructArray.from_arrays(

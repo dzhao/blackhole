@@ -37,10 +37,10 @@ def main():
         # Example: Get data for a key
         test_start = time.time()
         cnt = 0
-        batch_size = 5
+        batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("embeddings", 1, 3)]
+            features = [(None, 1, 3)]
             feature, st, end = features[0]
             reader = client.get_data(
                 ids, 
