@@ -3,7 +3,7 @@ import pyarrow.flight as flight
 import grpc
 
 class FeatureClient:
-    def __init__(self, host="localhost", port=50051, wait_timeout=300):
+    def __init__(self, host="localhost", port=50051, wait_timeout=3600):
         location = flight.Location.for_grpc_tcp(host, port)
         options = [
             ('grpc.enable_retries', 1),
@@ -11,6 +11,7 @@ class FeatureClient:
             ('grpc.service_config', '{"methodConfig": [{ \
                 "name": [{"service": "arrow.flight.protocol.FlightService"}], \
                 "waitForReady": true, \
+                "timeout": "3600s", \
                 "retryPolicy": { \
                     "maxAttempts": 5, \
                     "initialBackoff": "1s", \
