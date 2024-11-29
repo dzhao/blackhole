@@ -40,7 +40,7 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 2, 3), ("f1", 2, 3), ("f2", 2, 3)]
+            features = [("", 2, 3)] #, ("f1", 2, 3), ("f2", 2, 3)]
             feature, st, end = features[0]
             reader = client.get_data(
                 ids, 
