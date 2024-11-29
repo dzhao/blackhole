@@ -172,7 +172,7 @@ impl FlightService for FlightDbServer {
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner().ticket;
         let (ids, features) = self.decode_ticket(&ticket)?;
-        
+
         // Create schema with List<Float32> type for each feature
         let schema = Arc::new(Schema::new(
             features
@@ -204,17 +204,18 @@ impl FlightService for FlightDbServer {
                     return Err(Status::not_found("No matching data found in database"));
                 }
                 array_arrays[i].push(Some(values));
-                
-                // Create a ListArray containing the Float32Array
-                // let list_array = ListArray::from_iter_primitive::<Float32Type, _, _>(
-                    // vec![Some(values)]
-                // );
-                // arrays.push(Arc::new(list_array) as Arc<dyn Array>);
             }
         }
-        let arrays = array_arrays.iter().map(|array| Arc::new(ListArray::from_iter_primitive::<Float32Type, _, _>(array.clone())) as Arc<dyn Array>).collect::<Vec<_>>();
+        let arrays = array_arrays
+            .into_iter()
+            .map(|array| {
+                Arc::new(ListArray::from_iter_primitive::<Float32Type, _, _>(
+                    array,
+                )) as Arc<dyn Array>
+            })
+            .collect::<Vec<_>>();
         let batch = RecordBatch::try_new(schema.clone(), arrays)
-                .map_err(|e| Status::internal(e.to_string()))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
         let stream = stream::iter(vec![batch]).map(Ok);
         let fd = FlightDataEncoderBuilder::new()
             .with_schema(schema)
