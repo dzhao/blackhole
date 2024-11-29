@@ -39,7 +39,8 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 2, 3), ("f1", 2, 8), ("f2", 1, 10)]
+            # features = [("", 2, 3), ("f1", 2, 8)] #, ("f2", 1, 10)]
+            features = [("", 2, 8)]
             # feature, st, end = features[0]
             all_tensors = client.get_tensor(
                 ids, 
