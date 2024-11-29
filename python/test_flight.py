@@ -50,6 +50,7 @@ def main():
         # Read all batches from the stream
             offset = 0
             batch = next(reader)
+            breakpoint()
             for idx in range(batch_size):
                 if idx == offset+len(batch.data):
                     offset += len(batch.data)

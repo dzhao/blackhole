@@ -58,7 +58,7 @@ class FeatureClient:
         
         return flight.Ticket(sink.getvalue().to_pybytes())
 
-    def get_data(self, ids: list[str], features: list[tuple]):
+    def _get_data(self, ids: list[str], features: list[tuple]):
         """
         Retrieve data using a ticket containing feature tuples (name, start, end) and two scalar timestamps
         
@@ -71,3 +71,13 @@ class FeatureClient:
         """
         ticket = self._encode_ticket(ids, features)
         return self.client.do_get(ticket) 
+    
+    def get_tensor(self, ids: list[str], features: list[tuple]):
+        reader = self._get_data(ids, features)
+        all_tensors = []
+        for batch in reader:
+            tensors = []
+            for idx in len(features):
+                tensors.append(batch.data[idx].values.to_numpy(zero_copy_only=True))
+            all_tensors.append(tensors)
+        return all_tensors
