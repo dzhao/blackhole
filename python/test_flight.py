@@ -32,7 +32,6 @@ def main():
     
     # Create a client
     client = FeatureClient()
-    
     try:
         # Example: Get data for a key
         test_start = time.time()
@@ -40,53 +39,46 @@ def main():
         batch_size = 50
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
-            features = [("", 2, 3)] #, ("f1", 2, 8), ("f2", 1, 10)]
+            features = [("", 2, 3), ("f1", 2, 8), ("f2", 1, 10)]
             # feature, st, end = features[0]
-            reader = client.get_data(
+            all_tensors = client.get_tensor(
                 ids, 
                 features,
             )
-        
+
         # Read all batches from the stream
-            offset = 0
-            batch = next(reader)
-            breakpoint()
             for idx in range(batch_size):
-                if idx == offset+len(batch.data):
-                    offset += len(batch.data)
-                    batch = next(reader)
-                for feature, st, end in features:
+                for f_idx, (feature, st, end) in enumerate(features):
                     if not args.perf_test:
-                        golden_data = sample_data[ids[idx]][st:end+1]
+                        prefix = ids[idx] if feature == "" else f"{ids[idx]}.{feature}"
+                        golden_data = sample_data[prefix][st:end+1]
                         #flatten
                         golden_data = [e for l in golden_data for e in l]
-                        retrieved_data = batch.data[feature][idx-offset].values.to_pylist()
-                        assert golden_data == retrieved_data
-                    else:
-                        nump_data = batch.data[feature][idx-offset].values.to_numpy(zero_copy_only=True)
-                        assert nump_data.base is not None
-                        tf_tensor = tf.convert_to_tensor(nump_data)
-                idx += 1
+                        golden_tensor = tf.convert_to_tensor(golden_data)
+                        # assert golden_tensor == all_tensors[idx][f_idx]
+                        # breakpoint()
+                        # print(f"check {idx} {f_idx}")
+                        assert tf.reduce_all(tf.equal(golden_tensor, all_tensors[idx][f_idx]))
             cnt +=1
-            if cnt % 1000 == 0:
+            if not args.perf_test:
                 print(f"Processed {cnt} requests")
-                if args.perf_test:
-                    dur = time.time() - test_start
-                    cpu_percent = process.cpu_percent()
-                    
-                    print(f"Performance Metrics:")
-                    print(f"- Processed {cnt} requests in {dur:.3f} seconds")
-                    print(f"- QPS: {cnt/dur:.3f}")
-                    print(f"- Vectors/s: {cnt*batch_size*sum(e-s+1 for f, s,e in features)/dur:.3f}")
-                    print(f"- CPU Usage: {cpu_percent:.1f}%")
+            elif cnt % 1000 == 0:
+                dur = time.time() - test_start
+                cpu_percent = process.cpu_percent()
+                
+                print(f"Performance Metrics:")
+                print(f"- Processed {cnt} requests in {dur:.3f} seconds")
+                print(f"- QPS: {cnt/dur:.3f}")
+                print(f"- Vectors/s: {cnt*batch_size*sum(e-s+1 for f, s,e in features)/dur:.3f}")
+                print(f"- CPU Usage: {cpu_percent:.1f}%")
                 
                     # Only show I/O metrics if available
-                    if has_io_counters:
-                        current_io = process.io_counters()
-                        io_read_rate = (current_io.read_bytes - initial_io.read_bytes) / dur / 1024 / 1024  # MB/s
-                        io_write_rate = (current_io.write_bytes - initial_io.write_bytes) / dur / 1024 / 1024  # MB/s
-                        print(f"- I/O Read Rate: {io_read_rate:.2f} MB/s")
-                        print(f"- I/O Write Rate: {io_write_rate:.2f} MB/s")
+                if has_io_counters:
+                    current_io = process.io_counters()
+                    io_read_rate = (current_io.read_bytes - initial_io.read_bytes) / dur / 1024 / 1024  # MB/s
+                    io_write_rate = (current_io.write_bytes - initial_io.write_bytes) / dur / 1024 / 1024  # MB/s
+                    print(f"- I/O Read Rate: {io_read_rate:.2f} MB/s")
+                    print(f"- I/O Write Rate: {io_write_rate:.2f} MB/s")
     except flight.FlightUnavailableError:
         print("Could not connect to Flight server")
 

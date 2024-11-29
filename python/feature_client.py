@@ -1,7 +1,7 @@
 import pyarrow as pa
 import pyarrow.flight as flight
 import grpc
-
+import tensorflow as tf
 class FeatureClient:
     def __init__(self, host="localhost", port=50051, wait_timeout=3600):
         location = flight.Location.for_grpc_tcp(host, port)
@@ -74,10 +74,12 @@ class FeatureClient:
     
     def get_tensor(self, ids: list[str], features: list[tuple]):
         reader = self._get_data(ids, features)
-        all_tensors = []
+        all_tensors = [[None] * len(features) for _ in range(len(ids))]
+
+        offset = 0
         for batch in reader:
-            tensors = []
-            for idx in len(features):
-                tensors.append(batch.data[idx].values.to_numpy(zero_copy_only=True))
-            all_tensors.append(tensors)
+            for f_idx in range(len(features)):
+                for id_idx, feature_row in enumerate(batch.data[f_idx]):
+                    all_tensors[id_idx + offset][f_idx] = tf.convert_to_tensor(feature_row.values.to_numpy(zero_copy_only=True))
+            offset += len(batch.data)
         return all_tensors

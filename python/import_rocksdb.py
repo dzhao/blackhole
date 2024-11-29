@@ -33,8 +33,8 @@ def create_sample_data(db_path: str):
             # for idx in np.random.permutation(range(num_embeddings)):
             for idx in np.random.permutation(range(num_embeddings)):
                 # Key format: "{id}:{feature_name}:{index}"
-                embedding = np.random.randn(dim).astype(np.float32)
                 for feature_name in ["", "f1", "f2"]:
+                    embedding = np.random.randn(dim).astype(np.float32)
                     prefix = user_id if feature_name == "" else f"{user_id}.{feature_name}"
                     key = f"{prefix}:{idx:04d}".encode()
                     # Use tobytes() directly instead of float_to_bytes
