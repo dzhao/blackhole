@@ -11,7 +11,7 @@ use std::sync::Mutex;
 
 const EMBEDDING_SIZE:usize = 768;
 const READ_BATCH: usize = 50;
-const NUM_KEYS: usize = 40_000_000;
+const NUM_KEYS: usize = 4_000_000;
 
 pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, key_prefix: &str) -> Vec<Vec<u8>> {
     println!("writing {}..", key_prefix);
@@ -173,13 +173,18 @@ impl ConcurrentTester {
         }
     }
 
-    pub fn run_test(&self) -> ConcurrentTestResults {
+    pub fn run_test(&self, readonly: bool) -> ConcurrentTestResults {
         let start = Instant::now();
 
         let db = self.db.clone();
         let should_stop = self.should_stop.clone();
         let writer_handle = thread::spawn(move || {
-            writer_thread(db, should_stop, "concurrent");
+            if readonly {
+                println!("readonly, no concurrent write")
+            }
+            else {
+                writer_thread(db, should_stop, "concurrent");
+            }
         });
         // Spawn reader threads
         let handles: Vec<_> = (0..self.num_threads)
@@ -243,7 +248,7 @@ impl ConcurrentTester {
     }
 } 
 
-pub fn run_concurrent_benchmark(db: Box<dyn DbInterface>) {
+pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool) {
     let configs = vec![
         (1, "single thread"),
         (4, "4 threads"),
@@ -254,7 +259,7 @@ pub fn run_concurrent_benchmark(db: Box<dyn DbInterface>) {
     println!("\nRunning concurrent benchmarks for {}", db.db_type());
     println!("----------------------------------------");
 
-    let db = Arc::new(db);
+    // let db = Arc::new(db);
     let keys = writer_thread(
         db.clone(), 
         Arc::new(AtomicBool::new(false)),
@@ -269,9 +274,9 @@ pub fn run_concurrent_benchmark(db: Box<dyn DbInterface>) {
             Duration::from_secs(30)
         );
 
-        let results = tester.run_test();
+        let results = tester.run_test(readonly);
 
-        println!("\n{} results:", desc);
+        println!("\n{} results(readonly: {}):", desc, readonly);
         println!("  Throughput: {:.2} ops/sec", results.throughput);
         println!("  Latencies (ms):");
         println!("    p50: {:.3}", results.latency_p50_ms);
