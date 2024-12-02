@@ -36,11 +36,11 @@ def main():
         # Example: Get data for a key
         test_start = time.time()
         cnt = 0
-        batch_size = 50
+        batch_size = 100
         while True:
             ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
             # features = [("", 2, 3), ("f1", 2, 8)] #, ("f2", 1, 10)]
-            features = [("", 2, 8)]
+            features = [("", 2, 3)]
             # feature, st, end = features[0]
             all_tensors = client.get_tensor(
                 ids, 
@@ -54,11 +54,12 @@ def main():
                         prefix = ids[idx] if feature == "" else f"{ids[idx]}.{feature}"
                         golden_data = sample_data[prefix][st:end+1]
                         #flatten
-                        golden_data = [e for l in golden_data for e in l]
+                        golden_data = [e for l in reversed(golden_data) for e in l]
                         golden_tensor = tf.convert_to_tensor(golden_data)
                         # assert golden_tensor == all_tensors[idx][f_idx]
                         # breakpoint()
                         # print(f"check {idx} {f_idx}")
+                        # breakpoint()
                         assert tf.reduce_all(tf.equal(golden_tensor, all_tensors[idx][f_idx]))
             cnt +=1
             if not args.perf_test:

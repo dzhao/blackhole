@@ -3,6 +3,7 @@ import json
 import rocksdict
 import struct
 import numpy as np
+from feature_client import FeatureClient
 
 def create_sample_data(db_path: str):
     # Open Rocksdict
@@ -36,7 +37,9 @@ def create_sample_data(db_path: str):
                 for feature_name in ["", "f1", "f2"]:
                     embedding = np.random.randn(dim).astype(np.float32)
                     prefix = user_id if feature_name == "" else f"{user_id}.{feature_name}"
-                    key = f"{prefix}:{idx:04d}".encode()
+                    ##use reverse encoding so latest coming in front
+                    key = FeatureClient.encode(prefix, idx)
+                    # key = f"{prefix}:{(-idx):04d}".encode()
                     # Use tobytes() directly instead of float_to_bytes
                     value = embedding.tobytes()
                     db[key] = value

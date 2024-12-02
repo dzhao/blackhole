@@ -33,10 +33,10 @@ impl DbInterface for RocksDbWrapper {
     fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>> {
         let mut values = Vec::new();
         let iter = self.0.iterator(
-            IteratorMode::From(self.encode(prefix, start_ts).as_bytes(), Direction::Forward));
+            IteratorMode::From(self.reverse_encode(prefix, end_ts).as_bytes(), Direction::Forward));
         for item in iter {
             let (key, value) = item?;
-            if &*key > self.encode(prefix, end_ts).as_bytes() {
+            if &*key > self.reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
             values.extend_from_slice(&self.numpy_f32_vec(&value));

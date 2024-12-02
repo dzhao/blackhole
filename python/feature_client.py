@@ -83,3 +83,7 @@ class FeatureClient:
                     all_tensors[id_idx + offset][f_idx] = tf.convert_to_tensor(feature_row.values.to_numpy(zero_copy_only=True))
             offset += len(batch.data)
         return all_tensors
+
+    @classmethod
+    def encode(cls, prefix, ts):
+        return f"{prefix}.{65535-ts:04x}".encode("utf-8")

@@ -23,10 +23,10 @@ pub trait DbInterface: Send + Sync {
     fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>>;
     
     fn reverse_encode(&self, prefix: &str, ts: u16) -> String {
-        format!("{}:{:04}", prefix, u16::MAX - ts)
+        format!("{}.{:04x}", prefix, u16::MAX - ts)
     }
     fn encode(&self, prefix: &str, ts: u16) -> String {
-        format!("{}:{:04}", prefix, ts)
+        format!("{}.{:04x}", prefix, ts)
     }
     fn numpy_f32_vec(&self, bytes: &[u8]) -> Vec<Option<f32>> {
         bytes
