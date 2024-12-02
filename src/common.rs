@@ -10,8 +10,8 @@ use histogram::Histogram;
 use std::sync::Mutex;
 
 const EMBEDDING_SIZE:usize = 768;
-const READ_BATCH: usize = 1_00;
-const NUM_KEYS: usize = 4_000_000;
+const READ_BATCH: usize = 50;
+const NUM_KEYS: usize = 40_000_000;
 
 pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, key_prefix: &str) -> Vec<Vec<u8>> {
     println!("writing {}..", key_prefix);
