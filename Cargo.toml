@@ -15,7 +15,9 @@ futures = "0.3"
 tonic = "0.12"
 tokio = { version = "1.35", features = ["full"] }
 bytes = "1.8"
-pyo3-arrow = "0.5"
+pyo3-arrow = "0.6"
+clap = { version = "4.4", features = ["derive"] }
+lazy_static = "1.5"
 [[bench]]
 name = "rocksdb_benchmarks"
 harness = false

@@ -11,16 +11,15 @@ use std::sync::Mutex;
 
 const EMBEDDING_SIZE:usize = 768;
 const READ_BATCH: usize = 50;
-const NUM_KEYS: usize = 4_000_000;
 
-pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, throttle: bool, key_prefix: &str) -> Vec<Vec<u8>> {
+pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, throttle: bool, key_prefix: &str, num_keys: usize) -> Vec<Vec<u8>> {
     println!("writing {}..", key_prefix);
     let start_time = std::time::Instant::now();
     let mut idx = 0;
     let write_batch_size = 1000;
     let mut batch = vec![];
     let mut keys = vec![];
-    while !should_stop.load(Ordering::Relaxed) && idx < NUM_KEYS {
+    while !should_stop.load(Ordering::Relaxed) && idx < num_keys {
         let key = format!("{}.{:010}", key_prefix, idx).into_bytes();
         assert_eq!(key.len(), 20, "key len mismatch:{}, {}", key_prefix, idx);
         keys.push(key.clone());
@@ -50,12 +49,12 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
     return keys;
 }
 
-pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
+pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>, num_keys: usize) {
     let mut group = c.benchmark_group(format!("{}_reads", db.db_type()));
     let db = Arc::new(db);
     
     // Prepare test data 
-    let sequential_keys = writer_thread(db.clone(), Arc::new(AtomicBool::new(false)), false, "pre_write");
+    let sequential_keys = writer_thread(db.clone(), Arc::new(AtomicBool::new(false)), false, "pre_write", num_keys);
     
     // Start background writer
     let should_stop = Arc::new(AtomicBool::new(false));
@@ -63,7 +62,7 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>) {
     let writer_stop = Arc::clone(&should_stop);
     
     let writer_handle = thread::spawn(move || {
-        writer_thread(writer_db, writer_stop, true, "postwrite");
+        writer_thread(writer_db, writer_stop, true, "postwrite", num_keys);
     });
     
     // Benchmark sequential reads
@@ -178,7 +177,7 @@ impl ConcurrentTester {
         }
     }
 
-    pub fn run_test(&self, readonly: bool) -> ConcurrentTestResults {
+    pub fn run_test(&self, readonly: bool, num_keys: usize) -> ConcurrentTestResults {
         let start = Instant::now();
 
         let db = self.db.clone();
@@ -188,7 +187,7 @@ impl ConcurrentTester {
                 println!("readonly, no concurrent write")
             }
             else {
-                writer_thread(db, should_stop, true, "concurren");
+                writer_thread(db, should_stop, true, "concurren", num_keys);
             }
         });
         // Spawn reader threads
@@ -253,7 +252,7 @@ impl ConcurrentTester {
     }
 } 
 
-pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool) {
+pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool, num_keys:usize) {
     let configs = vec![
         (1, "single thread"),
         (4, "4 threads"),
@@ -269,7 +268,8 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool) {
         db.clone(), 
         Arc::new(AtomicBool::new(false)),
         false,
-        "pre_write"
+        "pre_write",
+        num_keys,
         );
     let keys = Arc::new(keys);
     for (thread_count, desc) in configs {
@@ -280,7 +280,7 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool) {
             Duration::from_secs(30)
         );
 
-        let results = tester.run_test(readonly);
+        let results = tester.run_test(readonly, num_keys);
 
         println!("\n{} results(readonly: {}):", desc, readonly);
         println!("  Throughput: {:.2} ops/sec", results.throughput);
