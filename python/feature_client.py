@@ -2,6 +2,7 @@ import pyarrow as pa
 import pyarrow.flight as flight
 import grpc
 import tensorflow as tf
+from typing import List, Tuple
 class FeatureClient:
     def __init__(self, host="localhost", port=50051, wait_timeout=3600):
         location = flight.Location.for_grpc_tcp(host, port)
@@ -22,7 +23,7 @@ class FeatureClient:
         ]
         self.client = flight.connect(location, generic_options=options)
     
-    def _encode_ticket(self, ids: list[str], features: list[tuple]) -> flight.Ticket:
+    def _encode_ticket(self, ids: List[str], features: List[Tuple]) -> flight.Ticket:
         """
         Encode ids and features into a Flight ticket
         
