@@ -93,7 +93,7 @@ pub fn setup_rocks() -> Box<dyn DbInterface> {
     // Memory optimizations
     opts.set_write_buffer_size(4 * 1024 * 1024 * 1024);  // 4GB
     opts.set_max_write_buffer_number(6);
-    let cache = rocksdb::Cache::new_lru_cache(200 * 1024 * 1024 * 1024);  // 32GB
+    let cache = rocksdb::Cache::new_lru_cache(200 * 1024 * 1024 * 1024);  // 200GB
     let mut block_based_options = BlockBasedOptions::default();
     block_based_options.set_block_cache(&cache);
     opts.set_block_based_table_factory(&block_based_options);
