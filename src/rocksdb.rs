@@ -86,17 +86,21 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     Box::new(RocksDbWrapper(DB::open(&opts, "./test.db").unwrap()))
 }
 
-pub fn setup_rocks() -> Box<dyn DbInterface> {
+pub fn setup_rocks(use_block_cache: bool) -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     opts.create_if_missing(true);
     
     // Memory optimizations
     opts.set_write_buffer_size(4 * 1024 * 1024 * 1024);  // 4GB
     opts.set_max_write_buffer_number(6);
-    let cache = rocksdb::Cache::new_lru_cache(200 * 1024 * 1024 * 1024);  // 200GB
+    
     let mut block_based_options = BlockBasedOptions::default();
-    block_based_options.set_block_cache(&cache);
-    opts.set_block_based_table_factory(&block_based_options);
+    
+    if use_block_cache {
+        let cache = rocksdb::Cache::new_lru_cache(200 * 1024 * 1024 * 1024);  // 200GB
+        block_based_options.set_block_cache(&cache);
+        opts.set_block_based_table_factory(&block_based_options);
+    }
     
     // PlainTable configuration - good for memory-mapped files
     let factory_opts = PlainTableFactoryOptions {

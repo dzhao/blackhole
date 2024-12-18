@@ -10,6 +10,8 @@ struct Args {
     /// Number of keys to use in benchmark
     #[arg(long, default_value_t = 4)]
     num_mkeys: u64,
+    #[arg(long, default_value_t = false)]
+    rocksdb_use_block_cache: bool,
 }
 
 fn main() {
@@ -17,7 +19,7 @@ fn main() {
 
     // Create your database instance
     println!("Running rocksdb benchmark");
-    let db = Arc::new(rocksdb::setup_rocks());
+    let db = Arc::new(rocksdb::setup_rocks(args.rocksdb_use_block_cache));
     let num_keys = (args.num_mkeys * 1_000_000) as usize;
     common::run_concurrent_benchmark(db.clone(), true, num_keys);
     common::run_concurrent_benchmark(db, false, num_keys);
