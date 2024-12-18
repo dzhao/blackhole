@@ -48,10 +48,12 @@ impl DbInterface for LmdbWrapper {
 }
 
 pub fn setup_lmdb() -> Box<dyn DbInterface> {
+    let path = "./lmdb_bench";
+    std::fs::create_dir_all(path).unwrap();
     let env = Environment::new()
         .set_map_size(80*1024_usize.pow(3)) // 1TB
         .set_max_dbs(1)
-        .open(std::path::Path::new("./lmdb_bench"))
+        .open(std::path::Path::new(path))
         .unwrap();
     let db = env.create_db(None, DatabaseFlags::default()).unwrap();
     Box::new(LmdbWrapper { env, db })
