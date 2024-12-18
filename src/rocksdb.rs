@@ -89,9 +89,8 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
 pub fn setup_rocks() -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     opts.create_if_missing(true);
-    opts.set_write_buffer_size(1024 * 1024 * 1024); // 64MB
+    opts.set_write_buffer_size(1024 * 1024 * 1024); // 1GB
     opts.set_max_write_buffer_number(3);
-    /*
     let factory_opts = PlainTableFactoryOptions {
         user_key_length: 0,
         bloom_bits_per_key: 20,
@@ -104,6 +103,5 @@ pub fn setup_rocks() -> Box<dyn DbInterface> {
     };
     opts.set_plain_table_factory(&factory_opts);
     opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(20));
-    */
     Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_bench").unwrap()))
 } 
