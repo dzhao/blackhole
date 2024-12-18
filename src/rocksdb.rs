@@ -91,7 +91,7 @@ pub fn setup_rocks(use_block_cache: bool) -> Box<dyn DbInterface> {
     opts.create_if_missing(true);
     
     // Memory optimizations
-    opts.set_write_buffer_size(4 * 1024 * 1024 * 1024);  // 4GB
+    opts.set_write_buffer_size(64 * 1024 * 1024);  // 4GB
     opts.set_max_write_buffer_number(6);
     
     let mut block_based_options = BlockBasedOptions::default();
