@@ -23,7 +23,7 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
         let key = format!("{}.{:010}", key_prefix, idx).into_bytes();
         assert_eq!(key.len(), 20, "key len mismatch:{}, {}", key_prefix, idx);
         keys.push(key.clone());
-         if batch.len() == write_batch_size {
+         if batch.len() == writeb_batch_size {
             db.batch_put(&batch).expect("Failed to batch put");
             batch.clear();
             //sleep 500 ms so we have 2k qps write

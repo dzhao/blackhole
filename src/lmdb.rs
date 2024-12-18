@@ -1,4 +1,4 @@
-use lmdb::{Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
+use lmdb::{Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
 use crate::DbInterface;
 
 pub struct LmdbWrapper {
@@ -43,7 +43,22 @@ impl DbInterface for LmdbWrapper {
     }
     
     fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>> {
-        todo!()
+        let txn = self.env.begin_ro_txn()?;
+        let mut cursor = txn.open_ro_cursor(self.db)?;
+
+        // Create the start key for the range
+        let start_key = self.reverse_encode(prefix, end_ts);
+        
+        let mut values = Vec::new();
+        // Iterate through the range
+        for (key, value) in cursor.iter_from(&start_key.as_bytes()) {
+            if &*key > self.reverse_encode(prefix, start_ts).as_bytes() {
+                break;
+            }
+            values.extend_from_slice(&self.numpy_f32_vec(&value));
+        }
+        Ok(values)
+        
     }
 }
 
