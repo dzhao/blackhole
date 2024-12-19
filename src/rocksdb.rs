@@ -120,7 +120,7 @@ pub fn setup_rocks(use_block_cache: bool) -> Box<dyn DbInterface> {
     opts.set_allow_mmap_writes(true);
     
     // Prefix optimization (required for PlainTable)
-    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(20));
+    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(22));
     
-    Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_data").unwrap()))
+    Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_bench").unwrap()))
 } 
