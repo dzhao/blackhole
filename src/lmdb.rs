@@ -1,5 +1,5 @@
 use lmdb::{Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
-use crate::DbInterface;
+use crate::{DatabaseType, DbInterface};
 
 pub struct LmdbWrapper {
     env: Environment,
@@ -21,8 +21,12 @@ impl DbInterface for LmdbWrapper {
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
         let txn = self.env.begin_ro_txn()?;
         match txn.get(self.db, &key.as_bytes()) {
-            Ok(value) => Ok(Some(value.to_vec())),
-            Err(lmdb::Error::NotFound) => Ok(None),
+            Ok(value) => {
+                Ok(Some(value.to_vec()))
+            }
+            Err(lmdb::Error::NotFound) => {
+                Ok(None)
+            },
             Err(e) => Err(Box::new(e)),
         }
     }
@@ -47,12 +51,11 @@ impl DbInterface for LmdbWrapper {
         let mut cursor = txn.open_ro_cursor(self.db)?;
 
         // Create the start key for the range
-        let start_key = self.reverse_encode(prefix, end_ts);
-        
+        let start_key = DatabaseType::reverse_encode(prefix, end_ts);
         let mut values = Vec::new();
         // Iterate through the range
         for (key, value) in cursor.iter_from(&start_key.as_bytes()) {
-            if &*key > self.reverse_encode(prefix, start_ts).as_bytes() {
+            if &*key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
             values.extend_from_slice(&self.numpy_f32_vec(&value));
@@ -62,13 +65,13 @@ impl DbInterface for LmdbWrapper {
     }
 }
 
-pub fn setup_lmdb() -> Box<dyn DbInterface> {
-    let path = "./lmdb_bench";
-    std::fs::create_dir_all(path).unwrap();
+pub fn setup_lmdb(db_name: &str) -> Box<dyn DbInterface> {
+    // let path = "./lmdb_bench";
+    std::fs::create_dir_all(db_name).unwrap();
     let env = Environment::new()
         .set_map_size(80*1024_usize.pow(3)) // 1TB
         .set_max_dbs(1)
-        .open(std::path::Path::new(path))
+        .open(std::path::Path::new(db_name))
         .unwrap();
     let db = env.create_db(None, DatabaseFlags::default()).unwrap();
     Box::new(LmdbWrapper { env, db })

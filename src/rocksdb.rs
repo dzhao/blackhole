@@ -1,5 +1,5 @@
 use rocksdb::{BlockBasedOptions, Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, DB};
-use crate::DbInterface;
+use crate::{DatabaseType, DbInterface};
 
 pub struct RocksDbWrapper(DB);
 
@@ -14,7 +14,11 @@ impl DbInterface for RocksDbWrapper {
     }
 
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
-        Ok(self.0.get(key.as_bytes())?)
+        let res = self.0.get(key.as_bytes())?;
+        if res.is_none() {
+            println!("key:{key}, value:None");
+        }
+        Ok(res)
     }
 
     fn batch_put(&self, items: &[(String, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
@@ -33,10 +37,10 @@ impl DbInterface for RocksDbWrapper {
     fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>> {
         let mut values = Vec::new();
         let iter = self.0.iterator(
-            IteratorMode::From(self.reverse_encode(prefix, end_ts).as_bytes(), Direction::Forward));
+            IteratorMode::From(DatabaseType::reverse_encode(prefix, end_ts).as_bytes(), Direction::Forward));
         for item in iter {
             let (key, value) = item?;
-            if &*key > self.reverse_encode(prefix, start_ts).as_bytes() {
+            if &*key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
             values.extend_from_slice(&self.numpy_f32_vec(&value));
@@ -86,21 +90,21 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     Box::new(RocksDbWrapper(DB::open(&opts, "./test.db").unwrap()))
 }
 
-pub fn setup_rocks(use_block_cache: bool) -> Box<dyn DbInterface> {
+pub fn setup_rocks(db_name: &str, prefix_len: usize) -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     opts.create_if_missing(true);
     
     // Memory optimizations
-    opts.set_write_buffer_size(1 * 1024 * 1024 * 1024);  // 1GB, plaintableformat smaller than 31 bits
+    opts.set_write_buffer_size(128 * 1024 * 1024);  // 128MB, plaintableformat smaller than 31 bits
     opts.set_max_write_buffer_number(6);
     
-    let mut block_based_options = BlockBasedOptions::default();
+    // let mut block_based_options = BlockBasedOptions::default();
     
-    if use_block_cache {
-        let cache = rocksdb::Cache::new_lru_cache(200 * 1024 * 1024 * 1024);  // 200GB
-        block_based_options.set_block_cache(&cache);
-        opts.set_block_based_table_factory(&block_based_options);
-    }
+    // if use_block_cache {
+        // let cache = rocksdb::Cache::new_lru_cache(200 * 1024 * 1024 * 1024);  // 200GB
+        // block_based_options.set_block_cache(&cache);
+        // opts.set_block_based_table_factory(&block_based_options);
+    // }
     
     // PlainTable configuration - good for memory-mapped files
     let factory_opts = PlainTableFactoryOptions {
@@ -120,7 +124,7 @@ pub fn setup_rocks(use_block_cache: bool) -> Box<dyn DbInterface> {
     opts.set_allow_mmap_writes(true);
     
     // Prefix optimization (required for PlainTable)
-    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(22));
+    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(prefix_len));
     
-    Box::new(RocksDbWrapper(DB::open(&opts, "./rocksdb_bench").unwrap()))
+    Box::new(RocksDbWrapper(DB::open(&opts, db_name).unwrap()))
 } 

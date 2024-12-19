@@ -3,20 +3,20 @@ use std::sync::Arc;
 use std::thread;
 use criterion::{BenchmarkId, Criterion};
 use rand::Rng;
-use crate::DbInterface;
+use crate::{DatabaseType, DbInterface};
 use std::time::{Duration, Instant};
 use std::sync::atomic::AtomicU64;
 use histogram::Histogram;
 use std::sync::Mutex;
 
-const EMBEDDING_SIZE:usize = 10;
+const EMBEDDING_SIZE:usize = 1024;
 const READ_BATCH: usize = 50;
 
-pub fn generate_keys(num_keys: usize, num_per_key: usize) -> impl Iterator<Item=String> {
+pub fn generate_keys(num_keys: usize, num_per_key: u16) -> impl Iterator<Item=String> {
     assert!(num_per_key < 100);
-    (0..num_keys).flat_map(move |i| (0..num_per_key).map(move|j| format!("{i:010}{j:02}")))
+    (0..num_keys).flat_map(move |i| (0..num_per_key).map(move|j| DatabaseType::reverse_encode(&format!("{i:010}"), j)))
 }
-pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, throttle: bool, key_prefix: &str, num_keys: usize, num_per_key: usize) -> Vec<String> {
+pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, throttle: bool, key_prefix: &str, num_keys: usize, num_per_key: u16) -> Vec<String> {
     println!("writing {}..", key_prefix);
     let start_time = std::time::Instant::now();
     let mut idx = 0;
@@ -28,13 +28,13 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
             break;
         }
         let key = format!("{key_prefix}.{suffix}");
-        assert_eq!(key.len(), 22, "key len mismatch:{}, {}", key_prefix, idx);
+        assert_eq!(key.len(), 25, "key len mismatch:{}, {}", key_prefix, idx);
         //only copy the first key, i.e., the one ends with 00. this is in get we only have one key per suffix,
         //in prefix seek we have multiple keys per suffix but we only need the first one for prefix
-        if suffix.ends_with("00") {
+        if suffix.ends_with(".ffff") {
             keys.push(key.clone());
         }
-         if batch.len() == write_batch_size {
+        if batch.len() == write_batch_size {
             db.batch_put(&batch).expect("Failed to batch put");
             batch.clear();
             //sleep 500 ms so we have 2k qps write
@@ -42,9 +42,7 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
                 thread::sleep(Duration::from_millis(500));
             }
         }
-        else {
-            batch.push((key, generate_random_embedding()));
-        }
+        batch.push((key, generate_random_embedding()));
         idx += 1;
     }
     if !batch.is_empty() {
@@ -60,7 +58,7 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
     return keys;
 }
 
-pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>, num_keys: usize, num_per_key: usize) {
+pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>, num_keys: usize, num_per_key: u16) {
     let mut group = c.benchmark_group(format!("{}_reads", db.db_type()));
     let db = Arc::new(db);
     
@@ -191,15 +189,17 @@ impl ConcurrentTester {
     }
 
     fn test_query(db: &Box<dyn DbInterface>, key: &str, is_prefix_seek: bool) -> Result<(), Box<dyn std::error::Error>> {
+        let range = 10;
         if is_prefix_seek {
-            db.prefix_seek(key, 0, 5).map(|v|assert_eq!(v.len(), 5))
+            let prefix = &key[0..key.len()-5];
+            db.prefix_seek(prefix, 0, range-1).map(|v|assert_eq!(v.len(), EMBEDDING_SIZE*range as usize, "key:{key}"))
         }
         else {
-            db.get(key).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4))
+            db.get(key).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4, "key:{key}"))
         }
     }
 
-    pub fn run_test(&self, readonly: bool, num_keys: usize, num_per_key: usize) -> ConcurrentTestResults {
+    pub fn run_test(&self, readonly: bool, num_keys: usize, num_per_key: u16) -> ConcurrentTestResults {
         let start = Instant::now();
 
         let db = self.db.clone();
@@ -276,50 +276,47 @@ impl ConcurrentTester {
     }
 } 
 
-pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize) {
+pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize, num_per_key:u16) {
     let configs = vec![
-        (1, "single thread"),
-        (4, "4 threads"),
-        (8, "8 threads"),
+        // (1, "single thread"),
+        // (4, "4 threads"),
+        // (8, "8 threads"),
         (16, "16 threads"),
     ];
 
     println!("\nRunning concurrent benchmarks for {}", db.db_type());
     println!("----------------------------------------");
-
-    // let db = Arc::new(db);
-    for (num_per_key, is_prefix_seek) in [(1, false), (10, true)] {
-        let keys = writer_thread(
-            db.clone(), 
-            Arc::new(AtomicBool::new(false)),
-            false,
-            "pre_write",
-            num_keys,
-            num_per_key
-        );
-        let keys = Arc::new(keys);
-        for readonly in [true, false] {
-            for (thread_count, desc) in configs.clone() {
-                let tester = ConcurrentTester::new(
-                    db.clone(),
-                    keys.clone(),
-                    thread_count,
-                    Duration::from_secs(30),
-                    is_prefix_seek
+    let is_prefix_seek = num_per_key > 1;
+    let keys = writer_thread(
+        db.clone(), 
+        Arc::new(AtomicBool::new(false)),
+        false,
+        "pre_write",
+        num_keys,
+        num_per_key
+    );
+    let keys = Arc::new(keys);
+    for readonly in [true, false] {
+        for (thread_count, desc) in configs.clone() {
+            let tester = ConcurrentTester::new(
+                db.clone(),
+                keys.clone(),
+                thread_count,
+                Duration::from_secs(30),
+                is_prefix_seek
             );
 
-                let results = tester.run_test(readonly, num_keys, num_per_key);
-                let db_type = db.db_type();
-                println!("\n{desc} results({db_type}, readonly: {readonly}, is_prefix_seek: {is_prefix_seek}, num_keys: {num_keys}, num_per_key: {num_per_key}):");
-                println!("  Throughput: {:.2} ops/sec", results.throughput);
-                println!("  Latencies (ms):");
-                println!("    p50: {:.3}", results.latency_p50_ms);
-                println!("    p95: {:.3}", results.latency_p95_ms);
-                println!("    p99: {:.3}", results.latency_p99_ms);
-                println!("    max: {:.3}", results.latency_max_ms);
-                println!("  Total operations: {}", results.total_operations);
-                println!("  Errors: {}", results.errors);
-            }
+            let results = tester.run_test(readonly, num_keys, num_per_key);
+            let db_type = db.db_type();
+            println!("\n{desc} results({db_type}, readonly: {readonly}, is_prefix_seek: {is_prefix_seek}, num_keys: {num_keys}, num_per_key: {num_per_key}):");
+            println!("  Throughput: {:.2} ops/sec", results.throughput);
+            println!("  Latencies (ms):");
+            println!("    p50: {:.3}", results.latency_p50_ms);
+            println!("    p95: {:.3}", results.latency_p95_ms);
+            println!("    p99: {:.3}", results.latency_p99_ms);
+            println!("    max: {:.3}", results.latency_max_ms);
+            println!("  Total operations: {}", results.total_operations);
+            println!("  Errors: {}", results.errors);
         }
     }
 } 

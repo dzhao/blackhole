@@ -10,8 +10,11 @@ impl DatabaseType {
     pub fn create_db(&self) -> Box<dyn DbInterface> {
         match self {
             DatabaseType::RocksDB => rocksdb::open_rocks_readonly(),
-            DatabaseType::LMDB => lmdb::setup_lmdb(),
+            DatabaseType::LMDB => lmdb::setup_lmdb("lmdb_db.test"),
         }
+    }
+    pub fn reverse_encode(prefix: &str, ts: u16) -> String {
+        format!("{}.{:04x}", prefix, u16::MAX - ts)
     }
 }
 pub trait DbInterface: Send + Sync {
@@ -22,9 +25,6 @@ pub trait DbInterface: Send + Sync {
     fn close(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>>;
     
-    fn reverse_encode(&self, prefix: &str, ts: u16) -> String {
-        format!("{}.{:04x}", prefix, u16::MAX - ts)
-    }
     fn encode(&self, prefix: &str, ts: u16) -> String {
         format!("{}.{:04x}", prefix, ts)
     }
