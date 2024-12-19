@@ -9,7 +9,7 @@ use std::sync::atomic::AtomicU64;
 use histogram::Histogram;
 use std::sync::Mutex;
 
-const EMBEDDING_SIZE:usize = 1024;
+const EMBEDDING_SIZE:usize = 10;
 const READ_BATCH: usize = 50;
 
 pub fn generate_keys(num_keys: usize, num_per_key: usize) -> impl Iterator<Item=String> {
@@ -165,11 +165,12 @@ pub struct ConcurrentTester {
     ops_counter: Arc<AtomicU64>,
     error_counter: Arc<AtomicU64>,
     histogram: Arc<Mutex<Histogram>>,
+    is_prefix_seek: bool,
     should_stop: Arc<AtomicBool>,
 }
 
 impl ConcurrentTester {
-    pub fn new(db: Arc<Box<dyn DbInterface>>, keys: Arc<Vec<Vec<u8>>>, num_threads: usize, duration: Duration) -> Self {
+    pub fn new(db: Arc<Box<dyn DbInterface>>, keys: Arc<Vec<Vec<u8>>>, num_threads: usize, duration: Duration, is_prefix_seek: bool) -> Self {
         let should_stop = Arc::new(AtomicBool::new(false));
         // Pre-generate test data
 
@@ -184,7 +185,17 @@ impl ConcurrentTester {
             histogram: Arc::new(Mutex::new(Histogram::new(
                 10, 20  // min and max values in microseconds
             ).unwrap())),
+            is_prefix_seek,
             should_stop,
+        }
+    }
+
+    pub fn test_query(&self, key: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if self.is_prefix_seek {
+            self.db.prefix_seek(key, 0, 10).map(|v|assert_eq!(v.len(), 10))
+        }
+        else {
+            self.db.get(key.as_bytes()).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4))
         }
     }
 
@@ -285,23 +296,26 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool, n
         );
     let keys = Arc::new(keys);
     for (thread_count, desc) in configs {
-        let tester = ConcurrentTester::new(
-            db.clone(),
-            keys.clone(),
-            thread_count,
-            Duration::from_secs(30)
-        );
+        for (num_per_key, is_prefix_seek) in [(1, false), (10, true)] {
+            let tester = ConcurrentTester::new(
+                db.clone(),
+                keys.clone(),
+                thread_count,
+                Duration::from_secs(30),
+                is_prefix_seek
+            );
 
-        let results = tester.run_test(readonly, num_keys, 1);
+            let results = tester.run_test(readonly, num_keys, num_per_key);
 
-        println!("\n{} results(readonly: {}):", desc, readonly);
-        println!("  Throughput: {:.2} ops/sec", results.throughput);
-        println!("  Latencies (ms):");
-        println!("    p50: {:.3}", results.latency_p50_ms);
-        println!("    p95: {:.3}", results.latency_p95_ms);
-        println!("    p99: {:.3}", results.latency_p99_ms);
-        println!("    max: {:.3}", results.latency_max_ms);
-        println!("  Total operations: {}", results.total_operations);
-        println!("  Errors: {}", results.errors);
+            println!("\n{} results(readonly: {}):", desc, readonly);
+            println!("  Throughput: {:.2} ops/sec", results.throughput);
+            println!("  Latencies (ms):");
+            println!("    p50: {:.3}", results.latency_p50_ms);
+            println!("    p95: {:.3}", results.latency_p95_ms);
+            println!("    p99: {:.3}", results.latency_p99_ms);
+            println!("    max: {:.3}", results.latency_max_ms);
+            println!("  Total operations: {}", results.total_operations);
+            println!("  Errors: {}", results.errors);
+        }
     }
 } 
