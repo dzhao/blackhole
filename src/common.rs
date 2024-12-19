@@ -278,9 +278,9 @@ impl ConcurrentTester {
 
 pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize, num_per_key:u16) {
     let configs = vec![
-        // (1, "single thread"),
-        // (4, "4 threads"),
-        // (8, "8 threads"),
+        (1, "single thread"),
+        (4, "4 threads"),
+        (8, "8 threads"),
         (16, "16 threads"),
     ];
 
