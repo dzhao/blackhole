@@ -9,7 +9,7 @@ use std::sync::atomic::AtomicU64;
 use histogram::Histogram;
 use std::sync::Mutex;
 
-const EMBEDDING_SIZE:usize = 10;
+const EMBEDDING_SIZE:usize = 1024;
 const READ_BATCH: usize = 50;
 
 pub fn generate_keys(num_keys: usize, num_per_key: usize) -> impl Iterator<Item=String> {
@@ -274,7 +274,7 @@ impl ConcurrentTester {
     }
 } 
 
-pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool, num_keys:usize) {
+pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize) {
     let configs = vec![
         (1, "single thread"),
         (4, "4 threads"),
@@ -286,36 +286,38 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, readonly: bool, n
     println!("----------------------------------------");
 
     // let db = Arc::new(db);
-    let keys = writer_thread(
-        db.clone(), 
-        Arc::new(AtomicBool::new(false)),
-        false,
-        "pre_write",
-        num_keys,
-        1
+    for (num_per_key, is_prefix_seek) in [(1, false), (10, true)] {
+        let keys = writer_thread(
+            db.clone(), 
+            Arc::new(AtomicBool::new(false)),
+            false,
+            "pre_write",
+            num_keys,
+            num_per_key
         );
-    let keys = Arc::new(keys);
-    for (thread_count, desc) in configs {
-        for (num_per_key, is_prefix_seek) in [(1, false), (10, true)] {
-            let tester = ConcurrentTester::new(
-                db.clone(),
-                keys.clone(),
-                thread_count,
-                Duration::from_secs(30),
-                is_prefix_seek
+        let keys = Arc::new(keys);
+        for readonly in [true, false] {
+            for (thread_count, desc) in configs.clone() {
+                let tester = ConcurrentTester::new(
+                    db.clone(),
+                    keys.clone(),
+                    thread_count,
+                    Duration::from_secs(30),
+                    is_prefix_seek
             );
 
-            let results = tester.run_test(readonly, num_keys, num_per_key);
+                let results = tester.run_test(readonly, num_keys, num_per_key);
 
-            println!("\n{} results(readonly: {}):", desc, readonly);
-            println!("  Throughput: {:.2} ops/sec", results.throughput);
-            println!("  Latencies (ms):");
-            println!("    p50: {:.3}", results.latency_p50_ms);
-            println!("    p95: {:.3}", results.latency_p95_ms);
-            println!("    p99: {:.3}", results.latency_p99_ms);
-            println!("    max: {:.3}", results.latency_max_ms);
-            println!("  Total operations: {}", results.total_operations);
-            println!("  Errors: {}", results.errors);
+                println!("\n{} results(readonly: {}, is_prefix_seek: {}):", desc, readonly, is_prefix_seek);
+                println!("  Throughput: {:.2} ops/sec", results.throughput);
+                println!("  Latencies (ms):");
+                println!("    p50: {:.3}", results.latency_p50_ms);
+                println!("    p95: {:.3}", results.latency_p95_ms);
+                println!("    p99: {:.3}", results.latency_p99_ms);
+                println!("    max: {:.3}", results.latency_max_ms);
+                println!("  Total operations: {}", results.total_operations);
+                println!("  Errors: {}", results.errors);
+            }
         }
     }
 } 

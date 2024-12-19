@@ -21,12 +21,10 @@ fn main() {
     println!("Running rocksdb benchmark");
     let db = Arc::new(rocksdb::setup_rocks(args.rocksdb_use_block_cache));
     let num_keys = (args.num_mkeys * 1_000_000) as usize;
-    common::run_concurrent_benchmark(db.clone(), true, num_keys);
-    common::run_concurrent_benchmark(db, false, num_keys);
+    common::run_concurrent_benchmark(db.clone(), num_keys);
 
     println!("Running lmdb benchmark");
     let db = Arc::new(lmdb::setup_lmdb());
     // Just run the concurrent tests
-    common::run_concurrent_benchmark(db.clone(), true, num_keys);
-    common::run_concurrent_benchmark(db, false, num_keys);
+    common::run_concurrent_benchmark(db.clone(), num_keys);
 } 
