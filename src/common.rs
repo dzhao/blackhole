@@ -192,7 +192,7 @@ impl ConcurrentTester {
     fn test_query(db: &Box<dyn DbInterface>, key: &str, is_prefix_seek: bool) -> Result<(), Box<dyn std::error::Error>> {
         if is_prefix_seek {
             let prefix = &key[0..key.len()-5];
-            db.prefix_seek(prefix, 0, SEEK_RANGE-1).map(|v|assert_eq!(v.len(), EMBEDDING_SIZE*range as usize, "key:{key}"))
+            db.prefix_seek(prefix, 0, SEEK_RANGE-1).map(|v|assert_eq!(v.len(), EMBEDDING_SIZE*SEEK_RANGE as usize, "key:{key}"))
         }
         else {
             db.get(key).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4, "key:{key}"))
