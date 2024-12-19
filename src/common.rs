@@ -11,6 +11,7 @@ use std::sync::Mutex;
 
 const EMBEDDING_SIZE:usize = 1024;
 const READ_BATCH: usize = 50;
+const SEEK_RANGE: u16 = 10;
 
 pub fn generate_keys(num_keys: usize, num_per_key: u16) -> impl Iterator<Item=String> {
     assert!(num_per_key < 100);
@@ -189,10 +190,9 @@ impl ConcurrentTester {
     }
 
     fn test_query(db: &Box<dyn DbInterface>, key: &str, is_prefix_seek: bool) -> Result<(), Box<dyn std::error::Error>> {
-        let range = 10;
         if is_prefix_seek {
             let prefix = &key[0..key.len()-5];
-            db.prefix_seek(prefix, 0, range-1).map(|v|assert_eq!(v.len(), EMBEDDING_SIZE*range as usize, "key:{key}"))
+            db.prefix_seek(prefix, 0, SEEK_RANGE-1).map(|v|assert_eq!(v.len(), EMBEDDING_SIZE*range as usize, "key:{key}"))
         }
         else {
             db.get(key).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4, "key:{key}"))
@@ -308,7 +308,7 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize, n
 
             let results = tester.run_test(readonly, num_keys, num_per_key);
             let db_type = db.db_type();
-            println!("\n{desc} results({db_type}, readonly: {readonly}, is_prefix_seek: {is_prefix_seek}, num_keys: {num_keys}, num_per_key: {num_per_key}), dim:{EMBEDDING_SIZE}");
+            println!("\n{desc} results({db_type}, readonly: {readonly}, is_prefix_seek: {is_prefix_seek}, num_keys: {num_keys}, num_per_key: {num_per_key}), dim:{EMBEDDING_SIZE}, seek_range:{SEEK_RANGE}");
             println!("  Throughput: {:.2} ops/sec", results.throughput);
             println!("  Latencies (ms):");
             println!("    p50: {:.3}", results.latency_p50_ms);
