@@ -307,8 +307,8 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize) {
             );
 
                 let results = tester.run_test(readonly, num_keys, num_per_key);
-
-                println!("\n{} results(readonly: {}, is_prefix_seek: {}):", desc, readonly, is_prefix_seek);
+                let db_type = db.db_type();
+                println!("\n{desc} results({db_type}, readonly: {readonly}, is_prefix_seek: {is_prefix_seek}, num_keys: {num_keys}, num_per_key: {num_per_key}):");
                 println!("  Throughput: {:.2} ops/sec", results.throughput);
                 println!("  Latencies (ms):");
                 println!("    p50: {:.3}", results.latency_p50_ms);
