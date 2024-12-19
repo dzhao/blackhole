@@ -9,14 +9,14 @@ use std::sync::atomic::AtomicU64;
 use histogram::Histogram;
 use std::sync::Mutex;
 
-const EMBEDDING_SIZE:usize = 1024;
+const EMBEDDING_SIZE:usize = 10;
 const READ_BATCH: usize = 50;
 
 pub fn generate_keys(num_keys: usize, num_per_key: usize) -> impl Iterator<Item=String> {
     assert!(num_per_key < 100);
     (0..num_keys).flat_map(move |i| (0..num_per_key).map(move|j| format!("{i:010}{j:02}")))
 }
-pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, throttle: bool, key_prefix: &str, num_keys: usize, num_per_key: usize) -> Vec<Vec<u8>> {
+pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>, throttle: bool, key_prefix: &str, num_keys: usize, num_per_key: usize) -> Vec<String> {
     println!("writing {}..", key_prefix);
     let start_time = std::time::Instant::now();
     let mut idx = 0;
@@ -27,7 +27,7 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
         if should_stop.load(Ordering::Relaxed) {
             break;
         }
-        let key = format!("{key_prefix}.{suffix}").into_bytes();
+        let key = format!("{key_prefix}.{suffix}");
         assert_eq!(key.len(), 22, "key len mismatch:{}, {}", key_prefix, idx);
         //only copy the first key, i.e., the one ends with 00. this is in get we only have one key per suffix,
         //in prefix seek we have multiple keys per suffix but we only need the first one for prefix
@@ -95,7 +95,7 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>, num_
         });
     });
 
-    fn batch_reads(db: Arc<Box<dyn DbInterface>>, keys: &[Vec<u8>]) {
+    fn batch_reads(db: Arc<Box<dyn DbInterface>>, keys: &[String]) {
         let mut rng = rand::thread_rng();
         for _ in 0..READ_BATCH { 
             let idx = rng.gen_range(0..keys.len());
@@ -161,7 +161,7 @@ pub struct ConcurrentTester {
     db: Arc<Box<dyn DbInterface>>,
     num_threads: usize,
     duration: Duration,
-    keys: Arc<Vec<Vec<u8>>>,
+    keys: Arc<Vec<String>>,
     ops_counter: Arc<AtomicU64>,
     error_counter: Arc<AtomicU64>,
     histogram: Arc<Mutex<Histogram>>,
@@ -170,7 +170,7 @@ pub struct ConcurrentTester {
 }
 
 impl ConcurrentTester {
-    pub fn new(db: Arc<Box<dyn DbInterface>>, keys: Arc<Vec<Vec<u8>>>, num_threads: usize, duration: Duration, is_prefix_seek: bool) -> Self {
+    pub fn new(db: Arc<Box<dyn DbInterface>>, keys: Arc<Vec<String>>, num_threads: usize, duration: Duration, is_prefix_seek: bool) -> Self {
         let should_stop = Arc::new(AtomicBool::new(false));
         // Pre-generate test data
 
@@ -190,12 +190,12 @@ impl ConcurrentTester {
         }
     }
 
-    pub fn test_query(&self, key: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if self.is_prefix_seek {
-            self.db.prefix_seek(key, 0, 10).map(|v|assert_eq!(v.len(), 10))
+    fn test_query(db: &Box<dyn DbInterface>, key: &str, is_prefix_seek: bool) -> Result<(), Box<dyn std::error::Error>> {
+        if is_prefix_seek {
+            db.prefix_seek(key, 0, 10).map(|v|assert_eq!(v.len(), 10))
         }
         else {
-            self.db.get(key.as_bytes()).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4))
+            db.get(key).map(|v|assert_eq!(v.unwrap().len(), EMBEDDING_SIZE*4))
         }
     }
 
@@ -221,6 +221,7 @@ impl ConcurrentTester {
                 let errors = Arc::clone(&self.error_counter);
                 let hist = Arc::clone(&self.histogram);
                 let should_stop = self.should_stop.clone();
+                let is_prefix_seek = self.is_prefix_seek;
                 thread::spawn(move || {
                     let mut rng = rand::thread_rng();
                     
@@ -228,7 +229,8 @@ impl ConcurrentTester {
                         let idx = rng.gen_range(0..keys.len());
                         let op_start = Instant::now();
                         
-                        match db.get(&keys[idx]) {
+                        // match db.get(&keys[idx]) {
+                        match Self::test_query(&db, &keys[idx], is_prefix_seek) {
                             Ok(_) => {
                                 let latency = op_start.elapsed().as_micros() as u64;
                                 if let Ok(mut hist) = hist.lock() {

@@ -13,14 +13,14 @@ impl DbInterface for RocksDbWrapper {
         Ok(())
     }
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
-        Ok(self.0.get(key)?)
+    fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
+        Ok(self.0.get(key.as_bytes())?)
     }
 
-    fn batch_put(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
+    fn batch_put(&self, items: &[(String, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
         let mut batch = rocksdb::WriteBatch::default();
         for (key, value) in items {
-            batch.put(key, value);
+            batch.put(key.as_bytes(), value);
         }
         self.0.write(batch)?;
         Ok(())

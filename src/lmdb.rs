@@ -18,19 +18,19 @@ impl DbInterface for LmdbWrapper {
         Ok(())
     }
 
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
+    fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
         let txn = self.env.begin_ro_txn()?;
-        match txn.get(self.db, &key) {
+        match txn.get(self.db, &key.as_bytes()) {
             Ok(value) => Ok(Some(value.to_vec())),
             Err(lmdb::Error::NotFound) => Ok(None),
             Err(e) => Err(Box::new(e)),
         }
     }
 
-    fn batch_put(&self, items: &[(Vec<u8>, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
+    fn batch_put(&self, items: &[(String, Vec<u8>)]) -> Result<(), Box<dyn std::error::Error>> {
         let mut txn = self.env.begin_rw_txn()?;
         for (key, value) in items {
-            txn.put(self.db, key, value, WriteFlags::default())?;
+            txn.put(self.db, &key.as_bytes(), value, WriteFlags::default())?;
         }
         txn.commit()?;
         Ok(())
