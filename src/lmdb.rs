@@ -63,6 +63,11 @@ impl DbInterface for LmdbWrapper {
         Ok(values)
         
     }
+
+    fn compact(&self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("lmdb no need compact");
+        Ok(())
+    }
 }
 
 pub fn setup_lmdb(db_name: &str) -> Box<dyn DbInterface> {

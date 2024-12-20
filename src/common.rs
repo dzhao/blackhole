@@ -295,6 +295,7 @@ pub fn run_concurrent_benchmark(db: Arc<Box<dyn DbInterface>>, num_keys:usize, n
         num_keys,
         num_per_key
     );
+    db.compact().unwrap();
     let keys = Arc::new(keys);
     for readonly in [true, false] {
         for (thread_count, desc) in configs.clone() {

@@ -1,4 +1,4 @@
-use rocksdb::{BlockBasedOptions, Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, DB};
+use rocksdb::{BlockBasedOptions, Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, WaitForCompactOptions, DB};
 use crate::{DatabaseType, DbInterface};
 
 pub struct RocksDbWrapper(DB);
@@ -46,6 +46,13 @@ impl DbInterface for RocksDbWrapper {
             values.extend_from_slice(&self.numpy_f32_vec(&value));
         }
         Ok(values)
+    }
+
+    fn compact(&self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("compacting rocksdb...");
+        let opts = WaitForCompactOptions::default();
+        self.0.wait_for_compact(&opts)?;
+        Ok(())
     }
 
 }

@@ -34,4 +34,5 @@ pub trait DbInterface: Send + Sync {
             .map(|chunk| Some(f32::from_le_bytes(chunk.try_into().unwrap())))
             .collect()
     }
+    fn compact(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
