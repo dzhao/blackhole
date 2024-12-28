@@ -9,6 +9,7 @@ import argparse
 import time
 import psutil
 import os
+from import_rocksdb import NUM_EMBEDDINGS_PER_USER, DIM, NUM_USERS, NUM_GOLDEN_USERS
 
 def main():
     # Add argument parser
@@ -38,7 +39,10 @@ def main():
         cnt = 0
         batch_size = 100
         while True:
-            ids = [f"u{int(id):09d}" for id in np.random.randint(10, size=batch_size)]
+            if args.perf_test:
+                ids = [f"u{int(id):09d}" for id in np.random.randint(NUM_USERS, size=batch_size)]
+            else:
+                ids = [f"u{int(id):09d}" for id in np.random.randint(NUM_GOLDEN_USERS, size=batch_size)]
             # features = [("", 2, 3), ("f1", 2, 8)] #, ("f2", 1, 10)]
             features = [("", 2, 3)]
             # feature, st, end = features[0]

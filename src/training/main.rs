@@ -268,8 +268,10 @@ impl FlightService for FlightDbServer {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Flight server...");
-
+    let start_time = std::time::Instant::now();
     let server = FlightDbServer::new(DatabaseType::RocksDB);
+    let end_time = std::time::Instant::now();
+    println!("Time taken to load db : {:?}", end_time - start_time);
 
     let addr = "[::1]:50051".parse().unwrap();
     tonic::transport::Server::builder()
