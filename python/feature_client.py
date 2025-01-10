@@ -4,7 +4,7 @@ import grpc
 import tensorflow as tf
 from typing import List, Tuple
 class FeatureClient:
-    def __init__(self, host="localhost", port=50051, wait_timeout=3600):
+    def __init__(self, host="localhost", port=8081, wait_timeout=3600):
         location = flight.Location.for_grpc_tcp(host, port)
         options = [
             ('grpc.enable_retries', 1),

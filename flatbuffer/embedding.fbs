@@ -1,0 +1,5 @@
+namespace embedding;
+table EmbeddingFeatureDataFlat {
+    float32_vector:[float](id: 0);
+}
+root_type EmbeddingFeatureDataFlat;

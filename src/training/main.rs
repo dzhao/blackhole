@@ -208,7 +208,7 @@ impl FlightService for FlightDbServer {
                         return Err(Status::not_found("can't have end only"));
                     },
                     (None, None) => {
-                       DBUtil::numpy_f32_vec(&self.db.get(&prefix).unwrap().unwrap())
+                       DBUtil::flatbuffer_f32_vec(&self.db.get(&prefix).unwrap().unwrap())
                     }
                 };
                 if values.is_empty() {
@@ -283,7 +283,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start_time = std::time::Instant::now();
     let server = FlightDbServer::new(DatabaseType::RocksDB);
     println!("Server created in {:?}", start_time.elapsed());
-    let addr = "[::1]:50051".parse().unwrap();
+    let addr = "0.0.0.0:8081".parse().unwrap();
     tonic::transport::Server::builder()
         .add_service(FlightServiceServer::new(server))
         .serve(addr)

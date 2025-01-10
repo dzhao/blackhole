@@ -1,6 +1,7 @@
 pub mod lmdb;
 pub mod rocksdb;
 pub mod common;
+pub mod embedding_generated;
 pub enum DatabaseType {
     RocksDB,
     LMDB,
@@ -40,5 +41,14 @@ impl DBUtil {
             .chunks_exact(4)
             .map(|chunk| Some(f32::from_le_bytes(chunk.try_into().unwrap())))
             .collect()
+    }
+
+    pub fn flatbuffer_f32_vec(bytes: &[u8]) -> Vec<Option<f32>> {
+        use flatbuffers::root;
+        if let Ok(embedding) = root::<crate::embedding_generated::embedding::EmbeddingFeatureDataFlat>(bytes) {
+            embedding.float32_vector().map(|v| v.iter().map(|x| Some(x)).collect()).unwrap_or_default()
+        } else {
+            Vec::new()
+        }
     }
 }

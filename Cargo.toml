@@ -19,6 +19,7 @@ bytes = "1.8"
 pyo3-arrow = "0.6"
 clap = { version = "4.4", features = ["derive"] }
 lazy_static = "1.5"
+flatbuffers = "24.12"  # or your preferred version
 [[bench]]
 name = "rocksdb_benchmarks"
 harness = false
@@ -38,3 +39,6 @@ path = "src/training/main.rs"
 [[bin]]
 name = "serving"
 path = "src/serving/main.rs"
+
+[build-dependencies]
+flatc-rust = "0.2.0"
