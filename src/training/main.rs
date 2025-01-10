@@ -10,11 +10,10 @@ use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
-use blackhole::DbInterface;
-use blackhole::{rocksdb, DatabaseType};
-use bytes::Bytes;
+use blackhole::{DBUtil, DbInterface};
+use blackhole::{DatabaseType};
 use futures::{
-    stream::{self, BoxStream},
+    stream::{self},
     Stream,
 };
 use futures::{StreamExt, TryStreamExt};
@@ -195,11 +194,23 @@ impl FlightService for FlightDbServer {
                 } else {
                     &format!("{}.{}", id, feature_name)
                 };
-                let values = self
-                    .db
-                    .prefix_seek(prefix, start.unwrap() as u16, end.unwrap() as u16)
-                    .map_err(|e| Status::internal(e.to_string()))?;
-
+                let values = match (start, end) {
+                    (Some(start), Some(end)) => {
+                        self
+                            .db
+                            .prefix_seek(prefix, *start as u16, *end as u16)
+                            .map_err(|e| Status::internal(e.to_string()))?
+                    },
+                    (Some(start), None) => {
+                       DBUtil::numpy_f32_vec(&self.db.get(&prefix).unwrap().unwrap())
+                    },
+                    (None, Some(end)) => {
+                        return Err(Status::not_found("can't have end only"));
+                    },
+                    (None, None) => {
+                       DBUtil::numpy_f32_vec(&self.db.get(&prefix).unwrap().unwrap())
+                    }
+                };
                 if values.is_empty() {
                     return Err(Status::not_found("No matching data found in database"));
                 }
@@ -268,11 +279,10 @@ impl FlightService for FlightDbServer {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Flight server...");
+
     let start_time = std::time::Instant::now();
     let server = FlightDbServer::new(DatabaseType::RocksDB);
-    let end_time = std::time::Instant::now();
-    println!("Time taken to load db : {:?}", end_time - start_time);
-
+    println!("Server created in {:?}", start_time.elapsed());
     let addr = "[::1]:50051".parse().unwrap();
     tonic::transport::Server::builder()
         .add_service(FlightServiceServer::new(server))
