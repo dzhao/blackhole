@@ -94,7 +94,7 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     };
     opts.set_plain_table_factory(&factory_opts);
     // opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
-    opts.set_prefix_extractor(SliceTransform::create_capped_prefix(60));
+    opts.set_prefix_extractor(SliceTransform::create_capped_prefix(64));
     Box::new(RocksDbWrapper(DB::open(&opts, "./test.db").unwrap()))
 }
 
