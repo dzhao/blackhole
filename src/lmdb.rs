@@ -1,5 +1,5 @@
 use lmdb::{Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
-use crate::{DatabaseType, DbInterface};
+use crate::{DBUtil, DatabaseType, DbInterface};
 
 pub struct LmdbWrapper {
     env: Environment,
@@ -58,7 +58,7 @@ impl DbInterface for LmdbWrapper {
             if &*key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
-            values.extend_from_slice(&self.numpy_f32_vec(&value));
+            values.extend_from_slice(&DBUtil::numpy_f32_vec(&value));
         }
         Ok(values)
         

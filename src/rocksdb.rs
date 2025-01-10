@@ -1,5 +1,5 @@
-use rocksdb::{BlockBasedOptions, Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, WaitForCompactOptions, DB};
-use crate::{DatabaseType, DbInterface};
+use rocksdb::{Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, WaitForCompactOptions, DB};
+use crate::{DBUtil, DatabaseType, DbInterface};
 
 pub struct RocksDbWrapper(DB);
 
@@ -43,7 +43,7 @@ impl DbInterface for RocksDbWrapper {
             if &*key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
-            values.extend_from_slice(&self.numpy_f32_vec(&value));
+            values.extend_from_slice(&DBUtil::numpy_f32_vec(&value));
         }
         Ok(values)
     }

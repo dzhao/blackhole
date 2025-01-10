@@ -25,14 +25,20 @@ pub trait DbInterface: Send + Sync {
     fn close(&self) -> Result<(), Box<dyn std::error::Error>>;
     fn prefix_seek(&self, prefix: &str, start_ts: u16, end_ts: u16) -> Result<Vec<Option<f32>>, Box<dyn std::error::Error>>;
     
-    fn encode(&self, prefix: &str, ts: u16) -> String {
+    fn compact(&self) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+pub struct DBUtil;
+
+impl DBUtil {
+    pub fn encode(prefix: &str, ts: u16) -> String {
         format!("{}.{:04x}", prefix, ts)
     }
-    fn numpy_f32_vec(&self, bytes: &[u8]) -> Vec<Option<f32>> {
+
+    pub fn numpy_f32_vec(bytes: &[u8]) -> Vec<Option<f32>> {
         bytes
             .chunks_exact(4)
             .map(|chunk| Some(f32::from_le_bytes(chunk.try_into().unwrap())))
             .collect()
     }
-    fn compact(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
