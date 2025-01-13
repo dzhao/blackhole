@@ -20,6 +20,7 @@ pyo3-arrow = "0.6"
 clap = { version = "4.4", features = ["derive"] }
 lazy_static = "1.5"
 flatbuffers = "24.12"  # or your preferred version
+serde_json = "1.0"
 [[bench]]
 name = "rocksdb_benchmarks"
 harness = false

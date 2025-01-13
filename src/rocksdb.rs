@@ -1,5 +1,7 @@
 use rocksdb::{Direction, IteratorMode, KeyEncodingType, Options, PlainTableFactoryOptions, SliceTransform, WaitForCompactOptions, DB};
 use crate::{DBUtil, DatabaseType, DbInterface};
+use serde_json::Value;
+use std::fs;
 
 pub struct RocksDbWrapper(DB);
 
@@ -77,7 +79,29 @@ impl SliceTransform for CustomPrefixTransform {
 }
 */
 
+fn read_rocks_config(db_path: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let config_path = format!("{}/rocksdict-config.json", db_path);
+    let config_str = fs::read_to_string(config_path)?;
+    let config: Value = serde_json::from_str(&config_str)?;
+    Ok(config)
+}
+
+fn apply_prefix_extractor(opts: &mut Options, config: &Value) {
+    if let Some(Value::Object(extractor)) = config.get("prefix_extractors").and_then(|p| p.get("default")) {
+        match extractor.iter().next() {
+            Some((key, value)) if key.as_str() == "Fixed" && value.is_u64() => {
+                opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(value.as_u64().unwrap() as usize));
+            },
+            Some((key, value)) if key.as_str() == "Capped" && value.is_u64() => {
+                opts.set_prefix_extractor(SliceTransform::create_capped_prefix(value.as_u64().unwrap() as usize));
+            },
+            _ => println!("unsupported prefix extractor configuration"),
+        }
+    }
+}
+
 pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
+    let db_path = "./test.db";
     let mut opts = Options::default();
     //minimize background jobs since we are only reading
     opts.set_max_background_jobs(0);
@@ -94,13 +118,23 @@ pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
     };
     opts.set_plain_table_factory(&factory_opts);
     // opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(10));
-    opts.set_prefix_extractor(SliceTransform::create_capped_prefix(64));
-    Box::new(RocksDbWrapper(DB::open(&opts, "./test.db").unwrap()))
+    // opts.set_prefix_extractor(SliceTransform::create_capped_prefix(64));
+    let config = read_rocks_config(&db_path).unwrap();
+    apply_prefix_extractor(&mut opts, &config);
+    Box::new(RocksDbWrapper(DB::open(&opts, db_path).unwrap()))
 }
 
 pub fn setup_rocks(db_name: &str, prefix_len: usize) -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     opts.create_if_missing(true);
+    
+    // Try to read config file
+    if let Ok(config) = read_rocks_config(db_name) {
+        apply_prefix_extractor(&mut opts, &config);
+    } else {
+        // Fallback to default prefix extractor
+        opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(prefix_len));
+    }
     
     // Memory optimizations
     opts.set_write_buffer_size(128 * 1024 * 1024);  // 128MB, plaintableformat smaller than 31 bits
@@ -130,9 +164,6 @@ pub fn setup_rocks(db_name: &str, prefix_len: usize) -> Box<dyn DbInterface> {
     // Enable memory mapping for PlainTable
     opts.set_allow_mmap_reads(true);
     opts.set_allow_mmap_writes(true);
-    
-    // Prefix optimization (required for PlainTable)
-    opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(prefix_len));
     
     Box::new(RocksDbWrapper(DB::open(&opts, db_name).unwrap()))
 } 
