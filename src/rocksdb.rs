@@ -90,9 +90,11 @@ fn apply_prefix_extractor(opts: &mut Options, config: &Value) {
     if let Some(Value::Object(extractor)) = config.get("prefix_extractors").and_then(|p| p.get("default")) {
         match extractor.iter().next() {
             Some((key, value)) if key.as_str() == "Fixed" && value.is_u64() => {
+                println!("using fixed prefix extractor with length: {}", value.as_u64().unwrap());
                 opts.set_prefix_extractor(SliceTransform::create_fixed_prefix(value.as_u64().unwrap() as usize));
             },
             Some((key, value)) if key.as_str() == "Capped" && value.is_u64() => {
+                println!("using capped prefix extractor with length: {}", value.as_u64().unwrap());
                 opts.set_prefix_extractor(SliceTransform::create_capped_prefix(value.as_u64().unwrap() as usize));
             },
             _ => println!("unsupported prefix extractor configuration"),
