@@ -40,6 +40,9 @@ path = "src/training/main.rs"
 [[bin]]
 name = "serving"
 path = "src/serving/main.rs"
+[[bin]]
+name = "client"
+path = "src/client/main.rs"
 
 [build-dependencies]
 flatc-rust = "0.2.0"
