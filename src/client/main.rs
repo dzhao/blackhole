@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a sample ticket payload with IDs and features
     let ticket_data = create_ticket_payload(
-        vec!["sample_id1", "sample_id2"],
+        vec!["sample_id1".to_string(), "sample_id2".to_string()],
         vec![
             ("feature1".to_string(), Some(0), Some(10)),
             ("feature2".to_string(), None, None),
@@ -71,19 +71,14 @@ fn create_ticket_payload(
         false,
     )])));
 
-    // Create arrays for the ticket data
-    let ids_array = arrow::array::StringArray::from(ids);
-    let ids_list = arrow::array::ListArray::try_new(
-        Arc::new(Field::new("item", DataType::Utf8, true)),
-        arrow::array::OffsetBuffer::new(vec![0, ids.len() as i32].into()),
-        Arc::new(ids_array) as ArrayRef,
-        None,
-    )?;
-
     let feature_names: Vec<_> = features.iter().map(|(name, _, _)| name.as_str()).collect();
     let feature_starts: Vec<_> = features.iter().map(|(_, start, _)| *start).collect();
     let feature_ends: Vec<_> = features.iter().map(|(_, _, end)| *end).collect();
 
+    // Create the ids list array
+    let ids_list = arrow::array::StringArray::from(ids);
+
+    // Create the feature struct array
     let feature_struct = arrow::array::StructArray::from(vec![
         (
             Arc::new(Field::new("name", DataType::Utf8, false)),
@@ -99,18 +94,7 @@ fn create_ticket_payload(
         ),
     ]);
 
-    let features_list = arrow::array::ListArray::try_new(
-        Arc::new(Field::new("item", DataType::Struct(Fields::from(vec![
-            Field::new("name", DataType::Utf8, false),
-            Field::new("start", DataType::Int16, true),
-            Field::new("end", DataType::Int16, true),
-        ])), false)),
-        arrow::array::OffsetBuffer::new(vec![0, features.len() as i32].into()),
-        Arc::new(feature_struct) as ArrayRef,
-        None,
-    )?;
-
-    let struct_array = arrow::array::StructArray::from(vec![
+    let feature_struct_array = arrow::array::StructArray::from(vec![
         (
             Arc::new(Field::new(
                 "ids",
@@ -133,11 +117,11 @@ fn create_ticket_payload(
                 ))),
                 false,
             )),
-            Arc::new(features_list) as ArrayRef,
+            Arc::new(feature_struct) as ArrayRef,
         ),
     ]);
 
-    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(struct_array)])?;
+    let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(feature_struct_array)])?;
 
     // Serialize the batch to bytes
     let mut buf = Vec::new();
