@@ -1,23 +1,19 @@
 use arrow::array::{Float32Array, ListArray, Array};
 use arrow::record_batch::RecordBatch;
-use blackhole_lib::client::{copy_record_batch, create_flight_client, fetch_features};
+use blackhole_lib::client::FeatureClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = create_flight_client().await?;
-    
-    let batches = fetch_features(
-        &mut client,
+    let mut client = FeatureClient::init().await?;
+    let (ids, features) = (
         vec!["u000000289".to_string(), "u000000288".to_string()],
         vec![
             ("f1".to_string(), Some(1), Some(1)),
             ("f2".to_string(), Some(1), Some(1)),
         ],
-    ).await?;
-    
-    println!("{batches:?}");
+    );
     let mut results = vec![];
-    copy_record_batch(batches, |values| results.extend_from_slice(values)).await?;
+    client.fetch_features_into(ids, features, |values| results.extend_from_slice(values)).await?;
     println!("{results:?}, {}", results.len());
     Ok(())
 }

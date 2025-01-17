@@ -52,43 +52,46 @@ pub fn create_fbs_ticket(
     Ok(builder.finished_data().to_vec().into())
 }
 
-pub async fn create_flight_client() -> Result<FlightClient, Box<dyn std::error::Error>> {
-    Ok(FlightClient::new(
-        Channel::from_static("http://localhost:8081").connect_lazy()
-    ))
+pub struct FeatureClient {
+    client: FlightClient,
 }
 
-pub async fn fetch_features(
-    client: &mut FlightClient,
-    user_ids: Vec<String>,
-    features: Vec<(String, Option<i16>, Option<i16>)>,
-) -> Result<Vec<RecordBatch>, Box<dyn std::error::Error>> {
-    let ticket = create_fbs_ticket(user_ids, features)?;
-    let ticket = Ticket {
-        ticket: ticket.into(),
-    };
-    
-    let stream = client.do_get(ticket).await?;
-    Ok(stream.try_collect().await?)
-} 
+impl FeatureClient {
+    pub async fn init() -> Result<Self, Box<dyn std::error::Error>> {
+        let client = FlightClient::new(
+            Channel::from_static("http://localhost:8081").connect_lazy()
+        );
+        Ok(Self { client })
+    }
 
-pub async fn copy_record_batch<F>(
-    batch: Vec<RecordBatch>,
-    mut callback: F
-) -> Result<(), Box<dyn std::error::Error>> 
-where
-    F: FnMut(&[f32])
-{
-    for rb in batch {
-        for i in 0..rb.num_rows() {
-        for field in rb.columns() {
-            if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
-                    if let Some(values) = list_array.value(i).as_any().downcast_ref::<Float32Array>() {
-                        callback(values.values());
+    pub async fn fetch_features_into<F>(
+        &mut self,
+        user_ids: Vec<String>,
+        features: Vec<(String, Option<i16>, Option<i16>)>,
+        mut callback: F,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        F: FnMut(&[f32]),
+    {
+        let ticket = create_fbs_ticket(user_ids, features)?;
+        let ticket = Ticket {
+            ticket: ticket.into(),
+        };
+        
+        let stream = self.client.do_get(ticket).await?;
+        let batches: Vec<RecordBatch> = stream.try_collect().await?;
+
+        for rb in batches {
+            for i in 0..rb.num_rows() {
+                for field in rb.columns() {
+                    if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
+                        if let Some(values) = list_array.value(i).as_any().downcast_ref::<Float32Array>() {
+                            callback(values.values());
+                        }
+                    }
                 }
             }
         }
-        }
+        Ok(())
     }
-    Ok(())
 }
