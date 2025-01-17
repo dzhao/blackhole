@@ -3,10 +3,10 @@ use arrow::record_batch::RecordBatch;
 use futures::stream::TryStreamExt;
 use arrow_flight::FlightClient;
 use tonic::transport::Channel;
-use blackhole::create_fbs_ticket;
+use blackhole_lib::create_fbs_ticket;
 
 // Move the client creation into a public function
-pub async fn create_flight_client() -> Result<FlightClient<Channel>, Box<dyn std::error::Error>> {
+pub async fn create_flight_client() -> Result<FlightClient, Box<dyn std::error::Error>> {
     Ok(FlightClient::new(
         Channel::from_static("http://localhost:8081").connect_lazy()
     ))
@@ -14,9 +14,9 @@ pub async fn create_flight_client() -> Result<FlightClient<Channel>, Box<dyn std
 
 // Make the feature fetching functionality public and reusable
 pub async fn fetch_features(
-    client: &mut FlightClient<Channel>,
+    client: &mut FlightClient,
     user_ids: Vec<String>,
-    features: Vec<(String, Option<i32>, Option<i32>)>,
+    features: Vec<(String, Option<i16>, Option<i16>)>,
 ) -> Result<Vec<RecordBatch>, Box<dyn std::error::Error>> {
     let ticket = create_fbs_ticket(user_ids, features)?;
     let ticket = arrow_flight::Ticket {

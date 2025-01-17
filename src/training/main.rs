@@ -10,8 +10,8 @@ use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
-use blackhole::{decode_fbs_ticket, DBUtil, DbInterface};
-use blackhole::{DatabaseType};
+use blackhole_lib::{decode_fbs_ticket, DBUtil, DbInterface};
+use blackhole_lib::{DatabaseType};
 use futures::{
     stream::{self},
     Stream,
