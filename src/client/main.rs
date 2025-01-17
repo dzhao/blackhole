@@ -1,33 +1,7 @@
 use arrow::array::{Float32Array, ListArray, Array};
 use arrow::record_batch::RecordBatch;
-use futures::stream::TryStreamExt;
-use arrow_flight::FlightClient;
-use tonic::transport::Channel;
-use blackhole_lib::create_fbs_ticket;
+use blackhole_lib::client::{create_flight_client, fetch_features};
 
-// Move the client creation into a public function
-pub async fn create_flight_client() -> Result<FlightClient, Box<dyn std::error::Error>> {
-    Ok(FlightClient::new(
-        Channel::from_static("http://localhost:8081").connect_lazy()
-    ))
-}
-
-// Make the feature fetching functionality public and reusable
-pub async fn fetch_features(
-    client: &mut FlightClient,
-    user_ids: Vec<String>,
-    features: Vec<(String, Option<i16>, Option<i16>)>,
-) -> Result<Vec<RecordBatch>, Box<dyn std::error::Error>> {
-    let ticket = create_fbs_ticket(user_ids, features)?;
-    let ticket = arrow_flight::Ticket {
-        ticket: ticket.into(),
-    };
-    
-    let stream = client.do_get(ticket).await?;
-    Ok(stream.try_collect().await?)
-}
-
-// Update main to use the new functions
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = create_flight_client().await?;
