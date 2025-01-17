@@ -1,6 +1,6 @@
 use arrow::array::{Float32Array, ListArray, Array};
 use arrow::record_batch::RecordBatch;
-use blackhole_lib::client::{create_flight_client, fetch_features};
+use blackhole_lib::client::{copy_record_batch, create_flight_client, fetch_features};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -10,11 +10,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut client,
         vec!["u000000289".to_string(), "u000000288".to_string()],
         vec![
-            ("f1".to_string(), Some(1), Some(10)),
+            ("f1".to_string(), Some(1), Some(1)),
+            ("f2".to_string(), Some(1), Some(1)),
         ],
     ).await?;
     
     println!("{batches:?}");
+    let mut results = vec![];
+    copy_record_batch(batches, |values| results.extend_from_slice(values)).await?;
+    println!("{results:?}, {}", results.len());
     Ok(())
 }
 

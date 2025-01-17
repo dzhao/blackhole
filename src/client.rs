@@ -1,4 +1,4 @@
-use arrow::record_batch::RecordBatch;
+use arrow::{array::{Array, Float32Array, ListArray}, record_batch::RecordBatch};
 use arrow_flight::{FlightClient, Ticket};
 use futures::stream::TryStreamExt;
 use tonic::transport::Channel;
@@ -71,3 +71,24 @@ pub async fn fetch_features(
     let stream = client.do_get(ticket).await?;
     Ok(stream.try_collect().await?)
 } 
+
+pub async fn copy_record_batch<F>(
+    batch: Vec<RecordBatch>,
+    mut callback: F
+) -> Result<(), Box<dyn std::error::Error>> 
+where
+    F: FnMut(&[f32])
+{
+    for rb in batch {
+        for i in 0..rb.num_rows() {
+        for field in rb.columns() {
+            if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
+                    if let Some(values) = list_array.value(i).as_any().downcast_ref::<Float32Array>() {
+                        callback(values.values());
+                }
+            }
+        }
+        }
+    }
+    Ok(())
+}
