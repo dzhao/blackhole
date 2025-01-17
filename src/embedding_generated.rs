@@ -115,75 +115,223 @@ impl core::fmt::Debug for EmbeddingFeatureDataFlat<'_> {
       ds.finish()
   }
 }
+pub enum TicketOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct Ticket<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Ticket<'a> {
+  type Inner = Ticket<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table::new(buf, loc) }
+  }
+}
+
+impl<'a> Ticket<'a> {
+  pub const VT_IDS: flatbuffers::VOffsetT = 4;
+  pub const VT_FEATURES: flatbuffers::VOffsetT = 6;
+  pub const VT_START: flatbuffers::VOffsetT = 8;
+  pub const VT_END: flatbuffers::VOffsetT = 10;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    Ticket { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args TicketArgs<'args>
+  ) -> flatbuffers::WIPOffset<Ticket<'bldr>> {
+    let mut builder = TicketBuilder::new(_fbb);
+    if let Some(x) = args.end { builder.add_end(x); }
+    if let Some(x) = args.start { builder.add_start(x); }
+    if let Some(x) = args.features { builder.add_features(x); }
+    if let Some(x) = args.ids { builder.add_ids(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn ids(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>(Ticket::VT_IDS, None)}
+  }
+  #[inline]
+  pub fn features(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>(Ticket::VT_FEATURES, None)}
+  }
+  #[inline]
+  pub fn start(&self) -> Option<flatbuffers::Vector<'a, u16>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u16>>>(Ticket::VT_START, None)}
+  }
+  #[inline]
+  pub fn end(&self) -> Option<flatbuffers::Vector<'a, u16>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u16>>>(Ticket::VT_END, None)}
+  }
+}
+
+impl flatbuffers::Verifiable for Ticket<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>>>("ids", Self::VT_IDS, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>>>("features", Self::VT_FEATURES, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u16>>>("start", Self::VT_START, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u16>>>("end", Self::VT_END, false)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct TicketArgs<'a> {
+    pub ids: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
+    pub features: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>>,
+    pub start: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u16>>>,
+    pub end: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u16>>>,
+}
+impl<'a> Default for TicketArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    TicketArgs {
+      ids: None,
+      features: None,
+      start: None,
+      end: None,
+    }
+  }
+}
+
+pub struct TicketBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> TicketBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_ids(&mut self, ids: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<&'b  str>>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Ticket::VT_IDS, ids);
+  }
+  #[inline]
+  pub fn add_features(&mut self, features: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<&'b  str>>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Ticket::VT_FEATURES, features);
+  }
+  #[inline]
+  pub fn add_start(&mut self, start: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u16>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Ticket::VT_START, start);
+  }
+  #[inline]
+  pub fn add_end(&mut self, end: flatbuffers::WIPOffset<flatbuffers::Vector<'b , u16>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(Ticket::VT_END, end);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> TicketBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    TicketBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<Ticket<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for Ticket<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("Ticket");
+      ds.field("ids", &self.ids());
+      ds.field("features", &self.features());
+      ds.field("start", &self.start());
+      ds.field("end", &self.end());
+      ds.finish()
+  }
+}
 #[inline]
-/// Verifies that a buffer of bytes contains a `EmbeddingFeatureDataFlat`
+/// Verifies that a buffer of bytes contains a `Ticket`
 /// and returns it.
 /// Note that verification is still experimental and may not
 /// catch every error, or be maximally performant. For the
 /// previous, unchecked, behavior use
-/// `root_as_embedding_feature_data_flat_unchecked`.
-pub fn root_as_embedding_feature_data_flat(buf: &[u8]) -> Result<EmbeddingFeatureDataFlat, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::root::<EmbeddingFeatureDataFlat>(buf)
+/// `root_as_ticket_unchecked`.
+pub fn root_as_ticket(buf: &[u8]) -> Result<Ticket, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::root::<Ticket>(buf)
 }
 #[inline]
 /// Verifies that a buffer of bytes contains a size prefixed
-/// `EmbeddingFeatureDataFlat` and returns it.
+/// `Ticket` and returns it.
 /// Note that verification is still experimental and may not
 /// catch every error, or be maximally performant. For the
 /// previous, unchecked, behavior use
-/// `size_prefixed_root_as_embedding_feature_data_flat_unchecked`.
-pub fn size_prefixed_root_as_embedding_feature_data_flat(buf: &[u8]) -> Result<EmbeddingFeatureDataFlat, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::size_prefixed_root::<EmbeddingFeatureDataFlat>(buf)
+/// `size_prefixed_root_as_ticket_unchecked`.
+pub fn size_prefixed_root_as_ticket(buf: &[u8]) -> Result<Ticket, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::size_prefixed_root::<Ticket>(buf)
 }
 #[inline]
 /// Verifies, with the given options, that a buffer of bytes
-/// contains a `EmbeddingFeatureDataFlat` and returns it.
+/// contains a `Ticket` and returns it.
 /// Note that verification is still experimental and may not
 /// catch every error, or be maximally performant. For the
 /// previous, unchecked, behavior use
-/// `root_as_embedding_feature_data_flat_unchecked`.
-pub fn root_as_embedding_feature_data_flat_with_opts<'b, 'o>(
+/// `root_as_ticket_unchecked`.
+pub fn root_as_ticket_with_opts<'b, 'o>(
   opts: &'o flatbuffers::VerifierOptions,
   buf: &'b [u8],
-) -> Result<EmbeddingFeatureDataFlat<'b>, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::root_with_opts::<EmbeddingFeatureDataFlat<'b>>(opts, buf)
+) -> Result<Ticket<'b>, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::root_with_opts::<Ticket<'b>>(opts, buf)
 }
 #[inline]
 /// Verifies, with the given verifier options, that a buffer of
-/// bytes contains a size prefixed `EmbeddingFeatureDataFlat` and returns
+/// bytes contains a size prefixed `Ticket` and returns
 /// it. Note that verification is still experimental and may not
 /// catch every error, or be maximally performant. For the
 /// previous, unchecked, behavior use
-/// `root_as_embedding_feature_data_flat_unchecked`.
-pub fn size_prefixed_root_as_embedding_feature_data_flat_with_opts<'b, 'o>(
+/// `root_as_ticket_unchecked`.
+pub fn size_prefixed_root_as_ticket_with_opts<'b, 'o>(
   opts: &'o flatbuffers::VerifierOptions,
   buf: &'b [u8],
-) -> Result<EmbeddingFeatureDataFlat<'b>, flatbuffers::InvalidFlatbuffer> {
-  flatbuffers::size_prefixed_root_with_opts::<EmbeddingFeatureDataFlat<'b>>(opts, buf)
+) -> Result<Ticket<'b>, flatbuffers::InvalidFlatbuffer> {
+  flatbuffers::size_prefixed_root_with_opts::<Ticket<'b>>(opts, buf)
 }
 #[inline]
-/// Assumes, without verification, that a buffer of bytes contains a EmbeddingFeatureDataFlat and returns it.
+/// Assumes, without verification, that a buffer of bytes contains a Ticket and returns it.
 /// # Safety
-/// Callers must trust the given bytes do indeed contain a valid `EmbeddingFeatureDataFlat`.
-pub unsafe fn root_as_embedding_feature_data_flat_unchecked(buf: &[u8]) -> EmbeddingFeatureDataFlat {
-  flatbuffers::root_unchecked::<EmbeddingFeatureDataFlat>(buf)
+/// Callers must trust the given bytes do indeed contain a valid `Ticket`.
+pub unsafe fn root_as_ticket_unchecked(buf: &[u8]) -> Ticket {
+  flatbuffers::root_unchecked::<Ticket>(buf)
 }
 #[inline]
-/// Assumes, without verification, that a buffer of bytes contains a size prefixed EmbeddingFeatureDataFlat and returns it.
+/// Assumes, without verification, that a buffer of bytes contains a size prefixed Ticket and returns it.
 /// # Safety
-/// Callers must trust the given bytes do indeed contain a valid size prefixed `EmbeddingFeatureDataFlat`.
-pub unsafe fn size_prefixed_root_as_embedding_feature_data_flat_unchecked(buf: &[u8]) -> EmbeddingFeatureDataFlat {
-  flatbuffers::size_prefixed_root_unchecked::<EmbeddingFeatureDataFlat>(buf)
+/// Callers must trust the given bytes do indeed contain a valid size prefixed `Ticket`.
+pub unsafe fn size_prefixed_root_as_ticket_unchecked(buf: &[u8]) -> Ticket {
+  flatbuffers::size_prefixed_root_unchecked::<Ticket>(buf)
 }
 #[inline]
-pub fn finish_embedding_feature_data_flat_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(
+pub fn finish_ticket_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(
     fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    root: flatbuffers::WIPOffset<EmbeddingFeatureDataFlat<'a>>) {
+    root: flatbuffers::WIPOffset<Ticket<'a>>) {
   fbb.finish(root, None);
 }
 
 #[inline]
-pub fn finish_size_prefixed_embedding_feature_data_flat_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>, root: flatbuffers::WIPOffset<EmbeddingFeatureDataFlat<'a>>) {
+pub fn finish_size_prefixed_ticket_buffer<'a, 'b, A: flatbuffers::Allocator + 'a>(fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>, root: flatbuffers::WIPOffset<Ticket<'a>>) {
   fbb.finish_size_prefixed(root, None);
 }
 }  // pub mod embedding
