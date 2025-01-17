@@ -10,7 +10,7 @@ use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
-use blackhole::{DBUtil, DbInterface};
+use blackhole::{decode_fbs_ticket, DBUtil, DbInterface};
 use blackhole::{DatabaseType};
 use futures::{
     stream::{self},
@@ -170,7 +170,9 @@ impl FlightService for FlightDbServer {
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner().ticket;
-        let (ids, features) = self.decode_ticket(&ticket)?;
+        let (ids, features) = self.decode_ticket(&ticket)
+            .or_else(|_| decode_fbs_ticket(&ticket)
+                .map_err(|e| Status::internal(e.to_string())))?;
 
         // Create schema with List<Float32> type for each feature
         let schema = Arc::new(Schema::new(

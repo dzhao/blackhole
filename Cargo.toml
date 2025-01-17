@@ -46,3 +46,8 @@ path = "src/client/main.rs"
 
 [build-dependencies]
 flatc-rust = "0.2.0"
+
+[lib]
+name = "blackhole_client"
+path = "src/client/lib.rs"
+crate-type = ["staticlib"]
