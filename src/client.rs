@@ -57,9 +57,9 @@ pub struct FeatureClient {
 }
 
 impl FeatureClient {
-    pub async fn init() -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn init(url: String) -> Result<Self, Box<dyn std::error::Error>> {
         let client = FlightClient::new(
-            Channel::from_static("http://localhost:8081").connect_lazy()
+            Channel::from_shared(url)?.connect_lazy()
         );
         Ok(Self { client })
     }
