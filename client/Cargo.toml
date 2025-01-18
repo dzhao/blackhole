@@ -1,0 +1,29 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rand = "0.8"
+histogram = "0.11"
+arrow = "54.0"
+arrow-flight = "54.0"
+futures = "0.3"
+tonic = "0.12"
+tokio = { version = "1.35", features = ["full"] }
+bytes = "1.8"
+clap = { version = "4.4", features = ["derive"] }
+lazy_static = "1.5"
+flatbuffers = "24.12"  # or your preferred version
+serde_json = "1.0"
+
+[build-dependencies]
+flatc-rust = "0.2.0"
+
+[lib]
+name = "blackhole_client"
+path = "src/lib.rs"
+
+[[bin]]
+name = "client"
+path = "src/main.rs"
