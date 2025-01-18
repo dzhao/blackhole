@@ -4,7 +4,7 @@ use blackhole_lib::client::FeatureClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = FeatureClient::init().await?;
+    let mut client = FeatureClient::init("http://localhost:8081".to_string()).await?;
     let (ids, features) = (
         vec!["u000000289".to_string(), "u000000288".to_string()],
         vec![

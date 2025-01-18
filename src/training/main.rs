@@ -204,10 +204,13 @@ impl FlightService for FlightDbServer {
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (Some(start), None) => {
-                       DBUtil::numpy_f32_vec(&self.db.get(&prefix).unwrap().unwrap())
+                        return Err(Status::not_found("can't have start only"));
                     },
                     (None, Some(end)) => {
-                        return Err(Status::not_found("can't have end only"));
+                        self
+                            .db
+                            .prefix_seek(prefix, *end as u16, *end as u16)
+                            .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (None, None) => {
                        DBUtil::flatbuffer_f32_vec(&self.db.get(&prefix).unwrap().unwrap())

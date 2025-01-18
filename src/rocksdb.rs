@@ -42,10 +42,10 @@ impl DbInterface for RocksDbWrapper {
             IteratorMode::From(DatabaseType::reverse_encode(prefix, end_ts).as_bytes(), Direction::Forward));
         for item in iter {
             let (key, value) = item?;
+            values.extend_from_slice(&DBUtil::numpy_f32_vec(&value));
             if &*key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
-            values.extend_from_slice(&DBUtil::numpy_f32_vec(&value));
         }
         Ok(values)
     }
