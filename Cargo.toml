@@ -1,4 +1,9 @@
 [workspace]
 members = [
+    "client",
     "server",
-] 
+    # Add other workspace members here
+]
+
+# Add the resolver configuration
+resolver = "2" 
