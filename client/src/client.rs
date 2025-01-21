@@ -4,6 +4,8 @@ use futures::stream::TryStreamExt;
 use tonic::transport::Channel;
 use flatbuffers::FlatBufferBuilder;
 use crate::embedding_generated::embedding::{Ticket as FbsTicket, TicketArgs};
+use tokio::time::{sleep, Duration};
+use std::error::Error;
 
 pub fn create_fbs_ticket(
     ids: Vec<String>,
@@ -69,29 +71,57 @@ impl FeatureClient {
         user_ids: Vec<String>,
         features: Vec<(String, Option<i16>, Option<i16>)>,
         mut callback: F,
-    ) -> Result<(), Box<dyn std::error::Error>>
+    ) -> Result<(), Box<dyn Error>>
     where
         F: FnMut(&[f32]),
     {
-        let ticket = create_fbs_ticket(user_ids, features)?;
+        // Retry parameters
+        let mut max_retries = 16;
+        let mut delay = Duration::from_secs(1);
+
+        // Prepare the ticket outside the retry loop
+        let ticket = create_fbs_ticket(user_ids.clone(), features.clone())?;
         let ticket = Ticket {
             ticket: ticket.into(),
         };
-        
-        let stream = self.client.do_get(ticket).await?;
+
+        let stream = loop {
+            match self.client.do_get(ticket.clone()).await {
+                Ok(s) => break s,
+                Err(e) => {
+                    if max_retries == 0 {
+                        eprintln!("All retry attempts failed: {}", e);
+                        return Err(Box::new(e));
+                    } else {
+                        eprintln!(
+                            "do_get failed: {}. Retrying in {:?}... ({} retries left)",
+                            e, delay, max_retries
+                        );
+                        sleep(delay).await;
+                        delay *= 2; // Exponential backoff
+                        max_retries -= 1; // Decrement retry counter
+                    }
+                }
+            }
+        };
+
+        // After successfully obtaining the stream, proceed to process it
         let batches: Vec<RecordBatch> = stream.try_collect().await?;
 
         for rb in batches {
             for i in 0..rb.num_rows() {
                 for field in rb.columns() {
                     if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
-                        if let Some(values) = list_array.value(i).as_any().downcast_ref::<Float32Array>() {
+                        if let Some(values) =
+                            list_array.value(i).as_any().downcast_ref::<Float32Array>()
+                        {
                             callback(values.values());
                         }
                     }
                 }
             }
         }
+
         Ok(())
     }
 }
