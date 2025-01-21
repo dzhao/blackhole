@@ -5,16 +5,18 @@ use blackhole_client::client::FeatureClient;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = FeatureClient::init("http://localhost:8081".to_string()).await?;
-    let (ids, features) = (
-        vec!["u000000289".to_string(), "u000000288".to_string()],
-        vec![
+    while true {
+        let (ids, features) = (
+            vec!["u000000289".to_string(), "u000000288".to_string()],
+            vec![
             ("f1".to_string(), Some(1), Some(1)),
             ("f2".to_string(), Some(1), Some(1)),
         ],
     );
-    let mut results = vec![];
-    client.fetch_features_into(ids, features, |values| results.extend_from_slice(values)).await?;
-    println!("{results:?}, {}", results.len());
+        let mut results = vec![];
+        client.fetch_features_into(ids, features, |values| results.extend_from_slice(values)).await?;
+        println!("{results:?}, {}", results.len());
+    }
     Ok(())
 }
 
