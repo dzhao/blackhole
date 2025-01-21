@@ -6,6 +6,7 @@ use flatbuffers::FlatBufferBuilder;
 use crate::embedding_generated::embedding::{Ticket as FbsTicket, TicketArgs};
 use tokio::time::{sleep, Duration};
 use std::error::Error;
+use rand::Rng;
 
 pub fn create_fbs_ticket(
     ids: Vec<String>,
@@ -93,11 +94,15 @@ impl FeatureClient {
                         eprintln!("All retry attempts failed: {}", e);
                         return Err(Box::new(e));
                     } else {
+                        // Add jitter to the delay (+/-10%)
+                        let jitter_factor = rand::thread_rng().gen_range(0.9..1.1);
+                        let jittered_delay = Duration::from_secs_f64(delay.as_secs_f64() * jitter_factor);
+
                         eprintln!(
                             "do_get failed: {}. Retrying in {:?}... ({} retries left)",
-                            e, delay, max_retries
+                            e, jittered_delay, max_retries
                         );
-                        sleep(delay).await;
+                        sleep(jittered_delay).await;
                         delay *= 2; // Exponential backoff
                         max_retries -= 1; // Decrement retry counter
                     }
