@@ -5,7 +5,7 @@ use tonic::transport::Channel;
 use flatbuffers::FlatBufferBuilder;
 use crate::embedding_generated::embedding::{Ticket as FbsTicket, TicketArgs};
 use tokio::time::{sleep, Duration};
-use std::error::Error;
+use std::{error::Error, rc::Rc};
 use rand::Rng;
 
 pub fn create_fbs_ticket(
@@ -81,7 +81,7 @@ impl FeatureClient {
         let mut delay = Duration::from_secs(1);
 
         // Prepare the ticket outside the retry loop
-        let ticket = create_fbs_ticket(user_ids.clone(), features.clone())?;
+        let ticket = create_fbs_ticket(user_ids, features)?;
         let ticket = Ticket {
             ticket: ticket.into(),
         };
