@@ -6,8 +6,7 @@ pub enum DatabaseType {
     LMDB,
 }
 
-use blackhole_client::embedding_generated::embedding::{Ticket, TicketArgs};
-use flatbuffers::FlatBufferBuilder;
+use blackhole_client::embedding_generated::embedding::Ticket;
 impl DatabaseType {
     pub fn create_db(&self) -> Box<dyn DbInterface> {
         match self {

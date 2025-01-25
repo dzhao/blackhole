@@ -1,4 +1,4 @@
-use lmdb::{Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Transaction, WriteFlags};
+use lmdb::{Cursor, Database, DatabaseFlags, Environment, Transaction, WriteFlags};
 use crate::{DBUtil, DatabaseType, DbInterface};
 
 pub struct LmdbWrapper {

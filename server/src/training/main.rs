@@ -1,6 +1,5 @@
 use arrow::array::{
-    Array, Float32Array, Int16Array, Int32Array, ListArray, RecordBatch, StringArray, StructArray,
-    UInt8Array,
+    Array, Int16Array, ListArray, RecordBatch, StringArray, StructArray,
 };
 use arrow::datatypes::{DataType, Field, Float32Type, Schema};
 use arrow::ipc::reader::StreamReader;
@@ -11,13 +10,13 @@ use arrow_flight::{
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
 use blackhole_lib::{decode_fbs_ticket, DBUtil, DbInterface};
-use blackhole_lib::{DatabaseType};
+use blackhole_lib::DatabaseType;
 use futures::{
     stream::{self},
     Stream,
 };
 use futures::{StreamExt, TryStreamExt};
-use std::{ops::Deref, pin::Pin, sync::Arc};
+use std::{pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
 
 pub struct FlightDbServer {
@@ -203,7 +202,7 @@ impl FlightService for FlightDbServer {
                             .prefix_seek(prefix, *start as u16, *end as u16)
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
-                    (Some(start), None) => {
+                    (Some(_), None) => {
                         return Err(Status::not_found("can't have start only"));
                     },
                     (None, Some(end)) => {
