@@ -81,6 +81,7 @@ impl SliceTransform for CustomPrefixTransform {
 
 fn read_rocks_config(db_path: &str) -> Result<Value, Box<dyn std::error::Error>> {
     let config_path = format!("{}/rocksdict-config.json", db_path);
+    println!("config_path: {}", config_path);
     let config_str = fs::read_to_string(config_path)?;
     let config: Value = serde_json::from_str(&config_str)?;
     Ok(config)

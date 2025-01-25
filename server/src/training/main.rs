@@ -32,13 +32,15 @@ struct Args {
 }
 
 pub struct FlightDbServer {
-    db: Box<dyn DbInterface>,
+    dbs: Vec<Box<dyn DbInterface>>,
+    shards: i16,
 }
 
 impl FlightDbServer {
-    pub fn new(db_type: DatabaseType, db_path: &str) -> Self {
+    pub fn new(db_type: DatabaseType, db_path: &str, shards: i16) -> Self {
         Self {
-            db: db_type.create_db(db_path),
+            dbs: (0..shards).map(|shard| db_type.create_db(&format!("{}/{:0>3}", db_path, shard))).collect(),
+            shards,
         }
     }
 
@@ -135,6 +137,7 @@ impl FlightDbServer {
 
         Ok((ids, features))
     }
+
 }
 
 #[tonic::async_trait]
@@ -176,7 +179,6 @@ impl FlightService for FlightDbServer {
         let output = futures::stream::empty();
         Ok(Response::new(Box::pin(output)))
     }
-
     async fn do_get(
         &self,
         request: Request<Ticket>,
@@ -208,24 +210,21 @@ impl FlightService for FlightDbServer {
                 } else {
                     &format!("{}.{}", id, feature_name)
                 };
+                let db = &self.dbs[DBUtil::shard_for_id(&id, self.shards)? as usize];
                 let values = match (start, end) {
                     (Some(start), Some(end)) => {
-                        self
-                            .db
-                            .prefix_seek(prefix, *start as u16, *end as u16)
+                            db.prefix_seek(prefix, *start as u16, *end as u16)
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (Some(_), None) => {
                         return Err(Status::not_found("can't have start only"));
                     },
                     (None, Some(end)) => {
-                        self
-                            .db
-                            .prefix_seek(prefix, *end as u16, *end as u16)
+                            db.prefix_seek(prefix, *end as u16, *end as u16)
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (None, None) => {
-                       DBUtil::flatbuffer_f32_vec(&self.db.get(&prefix).unwrap().unwrap())
+                       DBUtil::flatbuffer_f32_vec(&db.get(&prefix).unwrap().unwrap())
                     }
                 };
                 if values.is_empty() {
@@ -298,10 +297,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments
     let args = Args::parse();
 
-    println!("Starting Flight server with DB path: {}", args.db_path);
+    println!("Starting Flight server with DB path: {}, shards: {}", args.db_path, args.shards);
 
     let start_time = std::time::Instant::now();
-    let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path);
+    let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path, args.shards);
     println!("Server created in {:?}", start_time.elapsed());
     let addr = "0.0.0.0:8081".parse().unwrap();
     tonic::transport::Server::builder()

@@ -7,6 +7,8 @@ pub enum DatabaseType {
 }
 
 use blackhole_client::embedding_generated::embedding::Ticket;
+use tonic::Status;
+use murmur3::murmur3_x64_128;
 impl DatabaseType {
     pub fn create_db(&self, db_path: &str) -> Box<dyn DbInterface> {
         match self {
@@ -61,8 +63,68 @@ impl DBUtil {
             Vec::new()
         }
     }
+    pub fn hash_id(id: &str) -> Result<i64, Status> {
+        let mut cursor = std::io::Cursor::new(id.as_bytes());
+        let hash_bytes = murmur3_x64_128(&mut cursor, 0)?;
+        Ok(i64::from_le_bytes(hash_bytes.to_le_bytes()[0..8].try_into().unwrap()))
+    }
+       /// Determines the shard number for a given ID using the mmh3_hash128 function.
+    pub fn shard_for_id(id: &str, shards: i16) -> Result<i16, Status> {
+        assert!(shards > 0, "Shards must be greater than 0");
+        let hash_value = Self::hash_id(id)?;
+        Ok((hash_value.rem_euclid(shards as i64 * 24) / 24) as i16)
+    }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shard_for_id() {
+        let id = "test_id";
+        let shards = 10;
+        let shard = DBUtil::shard_for_id(id, shards).expect("Failed to compute shard");
+        assert!(
+            shard >= 0 && shard < shards,
+            "Shard {} is out of range",
+            shard
+        );
+    }
+
+    #[test]
+    fn test_shard_for_id_edge_case() {
+        let id = "";
+        let shards = 5;
+        let shard = DBUtil::shard_for_id(id, shards).expect("Failed to compute shard");
+        assert!(
+            shard >= 0 && shard < shards,
+            "Shard {} is out of range",
+            shard
+        );
+    }
+
+    #[test]
+    fn test_shard_for_id_large_shards() {
+        let id = "another_test_id";
+        let shards = 1000;
+        let shard = DBUtil::shard_for_id(id, shards).expect("Failed to compute shard");
+        assert!(
+            shard >= 0 && shard < shards,
+            "Shard {} is out of range",
+            shard
+        );
+    }
+    #[test]
+    fn test_hash_id() {
+        let id = "1037828263";
+
+        println!("{}", DBUtil::hash_id(id).unwrap());
+        assert!(DBUtil::hash_id(id).unwrap() == -5387033467748846870);
+        assert!(DBUtil::shard_for_id(id, 60).unwrap() == 0)
+    }
+
+}
 
 pub fn decode_fbs_ticket(
     ticket: &[u8],
