@@ -9,15 +9,25 @@ use arrow_flight::{
     Action, ActionType, Criteria, Empty, FlightData, FlightDescriptor, FlightInfo,
     HandshakeRequest, HandshakeResponse, PollInfo, PutResult, SchemaResult, Ticket,
 };
-use blackhole_lib::{decode_fbs_ticket, DBUtil, DbInterface};
-use blackhole_lib::DatabaseType;
+use blackhole_lib::{decode_fbs_ticket, DBUtil, DbInterface, DatabaseType};
+use clap::Parser;
 use futures::{
     stream::{self},
     Stream,
 };
-use futures::{StreamExt, TryStreamExt};
 use std::{pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
+use futures::{TryStreamExt, StreamExt};
+
+
+/// Command-line arguments for the Flight server.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path to the database
+    #[arg(long, default_value = "./test.db")]
+    db_path: String,
+}
 
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
@@ -124,6 +134,7 @@ impl FlightDbServer {
         Ok((ids, features))
     }
 }
+
 #[tonic::async_trait]
 impl FlightService for FlightDbServer {
     type HandshakeStream = Pin<Box<dyn Stream<Item = Result<HandshakeResponse, Status>> + Send>>;
@@ -282,10 +293,13 @@ impl FlightService for FlightDbServer {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Starting Flight server...");
+    // Parse command-line arguments
+    let args = Args::parse();
+
+    println!("Starting Flight server with DB path: {}", args.db_path);
 
     let start_time = std::time::Instant::now();
-    let server = FlightDbServer::new(DatabaseType::RocksDB);
+    let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path);
     println!("Server created in {:?}", start_time.elapsed());
     let addr = "0.0.0.0:8081".parse().unwrap();
     tonic::transport::Server::builder()
