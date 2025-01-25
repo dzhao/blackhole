@@ -27,6 +27,8 @@ struct Args {
     /// Path to the database
     #[arg(long, default_value = "./test.db")]
     db_path: String,
+    #[arg(long, default_value = "1")]
+    shards: i16,
 }
 
 pub struct FlightDbServer {
