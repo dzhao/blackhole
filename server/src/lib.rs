@@ -8,10 +8,10 @@ pub enum DatabaseType {
 
 use blackhole_client::embedding_generated::embedding::Ticket;
 impl DatabaseType {
-    pub fn create_db(&self) -> Box<dyn DbInterface> {
+    pub fn create_db(&self, db_path: &str) -> Box<dyn DbInterface> {
         match self {
-            DatabaseType::RocksDB => rocksdb::open_rocks_readonly(),
-            DatabaseType::LMDB => lmdb::setup_lmdb("lmdb_db.test"),
+            DatabaseType::RocksDB => rocksdb::open_rocks_readonly(db_path),
+            DatabaseType::LMDB => lmdb::setup_lmdb(db_path),
         }
     }
     pub fn reverse_encode(prefix: &str, ts: u16) -> String {

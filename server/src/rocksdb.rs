@@ -102,8 +102,7 @@ fn apply_prefix_extractor(opts: &mut Options, config: &Value) {
     }
 }
 
-pub fn open_rocks_readonly() -> Box<dyn DbInterface> {
-    let db_path = "./test.db";
+pub fn open_rocks_readonly(db_path: &str) -> Box<dyn DbInterface> {
     let mut opts = Options::default();
     //minimize background jobs since we are only reading
     opts.set_max_background_jobs(0);

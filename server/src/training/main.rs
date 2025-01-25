@@ -24,9 +24,9 @@ pub struct FlightDbServer {
 }
 
 impl FlightDbServer {
-    pub fn new(db_type: DatabaseType) -> Self {
+    pub fn new(db_type: DatabaseType, db_path: &str) -> Self {
         Self {
-            db: db_type.create_db(),
+            db: db_type.create_db(db_path),
         }
     }
 
