@@ -19,7 +19,6 @@ use std::{pin::Pin, sync::Arc};
 use tonic::{Request, Response, Status, Streaming};
 use futures::{TryStreamExt, StreamExt};
 
-
 /// Command-line arguments for the Flight server.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -29,6 +28,9 @@ struct Args {
     db_path: String,
     #[arg(long, default_value = "1")]
     shards: i16,
+    /// Number of worker threads for Tokio runtime
+    #[arg(long, default_value_t = 4)]
+    num_workers: usize,
 }
 
 pub struct FlightDbServer {
@@ -292,21 +294,28 @@ impl FlightService for FlightDbServer {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments
     let args = Args::parse();
 
-    println!("Starting Flight server with DB path: {}, shards: {}", args.db_path, args.shards);
+    // Build Tokio runtime with specified number of worker threads
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(args.num_workers)
+        .enable_all()
+        .build()?;
 
-    let start_time = std::time::Instant::now();
-    let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path, args.shards);
-    println!("Server created in {:?}", start_time.elapsed());
-    let addr = "0.0.0.0:8081".parse().unwrap();
-    tonic::transport::Server::builder()
-        .add_service(FlightServiceServer::new(server))
-        .serve(addr)
-        .await?;
+    println!("Starting Flight server with DB path: {}, shards: {}, num_workers: {}", args.db_path, args.shards, args.num_workers);
+
+    rt.block_on(async {
+        let start_time = std::time::Instant::now();
+        let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path, args.shards);
+        println!("Server created in {:?}", start_time.elapsed());
+        let addr = "0.0.0.0:8081".parse().unwrap();
+        tonic::transport::Server::builder()
+            .add_service(FlightServiceServer::new(server))
+            .serve(addr)
+            .await
+    })?;
 
     Ok(())
 }
