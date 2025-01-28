@@ -1,6 +1,7 @@
 pub mod common;
 pub mod lmdb;
 pub mod rocksdb;
+pub mod server;
 pub enum DatabaseType {
     RocksDB,
     LMDB,
@@ -166,4 +167,24 @@ pub fn decode_fbs_ticket(
         .collect();
 
     Ok((ids, feature_tuples))
+}
+
+pub async fn start_server(
+    addr: std::net::SocketAddr,
+    db_path: String,
+    shards: i16,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    println!(
+        "Starting Flight server at {} with DB path: {}, shards: {}",
+        addr, db_path, shards
+    );
+    let start_time = std::time::Instant::now();
+    let server = crate::server::FlightDbServer::new(DatabaseType::RocksDB, &db_path, shards);
+    println!("Server created in {:?}", start_time.elapsed());
+    
+    tonic::transport::Server::builder()
+        .add_service(arrow_flight::flight_service_server::FlightServiceServer::new(server))
+        .serve(addr)
+        .await
+        .map_err(|e| e.into())
 }
