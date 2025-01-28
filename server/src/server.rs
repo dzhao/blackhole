@@ -12,6 +12,7 @@ use tonic::{Request, Response, Status, Streaming};
 use futures::{Stream, stream};
 use crate::{DBUtil, DbInterface, DatabaseType};
 use futures::{TryStreamExt, StreamExt};
+use crate::decode_fbs_ticket;
 pub struct FlightDbServer {
     dbs: Vec<Box<dyn DbInterface>>,
     shards: i16,
@@ -156,7 +157,7 @@ impl FlightService for FlightDbServer {
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
         let ticket = request.into_inner().ticket;
-        let (ids, features) = self.decode_ticket(&ticket)?;
+        let (ids, features) = decode_fbs_ticket(&ticket).map_err(|e| Status::internal(e.to_string()))?;
 
         let schema = Arc::new(Schema::new(vec![Field::new(
             "embedding",
