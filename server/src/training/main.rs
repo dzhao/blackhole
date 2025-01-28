@@ -54,6 +54,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .enable_all()
         .build()?;
 
-    rt.block_on(blackhole_lib::start_server(addr, args.db_path, args.shards))?;
+    rt.block_on(blackhole_server::start_server(addr, args.db_path, args.shards))?;
     Ok(())
 }
