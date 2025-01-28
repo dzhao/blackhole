@@ -315,19 +315,35 @@ fn get_host_ip() -> Option<IpAddr> {
     }
     None
 }
-
+async fn start_server(
+    addr: String, 
+    db_path: String,
+    shards: i16,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!(
+        "Starting Flight server at {} with DB path: {}, shards: {}",
+        addr, db_path, shards
+    );
+    let start_time = std::time::Instant::now();
+    let server = FlightDbServer::new(DatabaseType::RocksDB, &db_path, shards);
+    println!("Server created in {:?}", start_time.elapsed());
+    eprintln!("{}", addr);
+    io::stderr().flush().await.unwrap();
+    tonic::transport::Server::builder()
+        .add_service(FlightServiceServer::new(server))
+        .serve(addr.parse()?)
+        .await
+        .map_err(|e| e.into())
+}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Parse command-line arguments
     let args = Args::parse();
-
     // Retrieve the host IP address
     let host_ip = get_host_ip().unwrap_or_else(|| {
         println!("No non-loopback IPv4 address found. Falling back to 127.0.0.1.");
         "127.0.0.1".parse().unwrap()
     });
-
     // Define the address to bind the server to
-    let addr = format!("{}:{}", host_ip, args.port)
+    let addr: std::net::SocketAddr = format!("{}:{}", host_ip, args.port)
         .parse()
         .expect("Invalid IP address or port");
 
@@ -337,22 +353,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .enable_all()
         .build()?;
 
-    println!(
-        "Starting Flight server at {} with DB path: {}, shards: {}, num_workers: {}",
-        addr, args.db_path, args.shards, args.num_workers
-    );
-
-    rt.block_on(async {
-        let start_time = std::time::Instant::now();
-        let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path, args.shards);
-        println!("Server created in {:?}", start_time.elapsed());
-        eprintln!("{}", addr);
-        io::stderr().flush().await.unwrap();
-        tonic::transport::Server::builder()
-            .add_service(FlightServiceServer::new(server))
-            .serve(addr)
-            .await
-    })?;
-
+    rt.block_on(start_server(addr.to_string(), args.db_path, args.shards))?;
     Ok(())
 }
