@@ -56,7 +56,7 @@ pub fn writer_thread(db: Arc<Box<dyn DbInterface>>, should_stop: Arc<AtomicBool>
         "Writer thread finished for {}. Total keys written: {}, Duration: {:.2?}, Throughput: {:.2} keys/sec",
         key_prefix, idx, duration, throughput
     );
-    return keys;
+    keys
 }
 
 pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>, num_keys: usize, num_per_key: u16) {
@@ -142,7 +142,7 @@ pub fn bench_reads_under_write(c: &mut Criterion, db: Box<dyn DbInterface>, num_
 pub fn generate_random_embedding() -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let embeddings: Vec<f32> = (0..EMBEDDING_SIZE).map(|_| rng.gen::<f32>()).collect();
-    embeddings.into_iter().map(|f| f.to_ne_bytes()).flatten().collect()
+    embeddings.into_iter().flat_map(|f| f.to_ne_bytes()).collect()
 } 
 
 #[derive(Debug)]
@@ -174,10 +174,10 @@ impl ConcurrentTester {
         // Pre-generate test data
 
         Self {
-            db: db,
+            db,
             num_threads,
             duration,
-            keys: keys,
+            keys,
             ops_counter: Arc::new(AtomicU64::new(0)),
             error_counter: Arc::new(AtomicU64::new(0)),
             // Configure histogram with microsecond precision

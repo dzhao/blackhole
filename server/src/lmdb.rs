@@ -54,11 +54,11 @@ impl DbInterface for LmdbWrapper {
         let start_key = DatabaseType::reverse_encode(prefix, end_ts);
         let mut values = Vec::new();
         // Iterate through the range
-        for (key, value) in cursor.iter_from(&start_key.as_bytes()) {
-            if &*key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
+        for (key, value) in cursor.iter_from(start_key.as_bytes()) {
+            if key > DatabaseType::reverse_encode(prefix, start_ts).as_bytes() {
                 break;
             }
-            values.extend_from_slice(&DBUtil::numpy_f32_vec(&value));
+            values.extend_from_slice(&DBUtil::numpy_f32_vec(value));
         }
         Ok(values)
         

@@ -58,7 +58,7 @@ impl DBUtil {
         {
             embedding
                 .float32_vector()
-                .map(|v| v.iter().map(|x| Some(x)).collect())
+                .map(|v| v.iter().map(Some).collect())
                 .unwrap_or_default()
         } else {
             Vec::new()
@@ -131,7 +131,7 @@ pub fn decode_fbs_ticket(
     ticket: &[u8],
 ) -> Result<(Vec<String>, Vec<(String, Option<i16>, Option<i16>)>), Box<dyn std::error::Error>> {
     // Verify the buffer and get the root Ticket
-    let ticket = flatbuffers::root::<Ticket>(&ticket)
+    let ticket = flatbuffers::root::<Ticket>(ticket)
         .map_err(|e| format!("Failed to read ticket: {}", e))?;
 
     // Extract IDs

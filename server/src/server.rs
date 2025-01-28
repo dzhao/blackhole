@@ -186,7 +186,7 @@ impl FlightService for FlightDbServer {
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (None, None) => {
-                        DBUtil::flatbuffer_f32_vec(&db.get(&prefix).unwrap().unwrap())
+                        DBUtil::flatbuffer_f32_vec(&db.get(prefix).unwrap().unwrap())
                     }
                 };
                 if values.is_empty() {
