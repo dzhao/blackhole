@@ -1,6 +1,6 @@
-use blackhole_lib::common;
-use blackhole_lib::lmdb;
-use blackhole_lib::rocksdb;
+use blackhole_server::common;
+use blackhole_server::lmdb;
+use blackhole_server::rocksdb;
 use clap::Parser;
 use std::sync::Arc;
 
