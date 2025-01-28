@@ -44,5 +44,5 @@ path = "src/training/main.rs"
 flatc-rust = "0.2.0"
 
 [lib]
-name = "blackhole_lib"
+name = "blackhole_server"
 path = "src/lib.rs"
