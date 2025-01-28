@@ -16,6 +16,7 @@ use futures::{
     Stream,
 };
 use get_if_addrs::get_if_addrs;
+use tokio::io::{self, AsyncWriteExt};
 use std::{pin::Pin, sync::Arc, net::IpAddr};
 use tonic::{Request, Response, Status, Streaming};
 use futures::{TryStreamExt, StreamExt};
@@ -346,6 +347,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path, args.shards);
         println!("Server created in {:?}", start_time.elapsed());
         eprintln!("{}", addr);
+        io::stderr().flush().await.unwrap();
         tonic::transport::Server::builder()
             .add_service(FlightServiceServer::new(server))
             .serve(addr)

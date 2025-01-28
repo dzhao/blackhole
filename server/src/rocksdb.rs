@@ -123,7 +123,7 @@ pub fn open_rocks_readonly(db_path: &str) -> Box<dyn DbInterface> {
     // opts.set_prefix_extractor(SliceTransform::create_capped_prefix(64));
     let config = read_rocks_config(&db_path).unwrap();
     apply_prefix_extractor(&mut opts, &config);
-    Box::new(RocksDbWrapper(DB::open(&opts, db_path).unwrap()))
+    Box::new(RocksDbWrapper(DB::open_for_read_only(&opts, db_path, false).unwrap()))
 }
 
 pub fn setup_rocks(db_name: &str, prefix_len: usize) -> Box<dyn DbInterface> {
