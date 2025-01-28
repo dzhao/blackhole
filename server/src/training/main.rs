@@ -15,7 +15,8 @@ use futures::{
     stream::{self},
     Stream,
 };
-use std::{pin::Pin, sync::Arc};
+use get_if_addrs::get_if_addrs;
+use std::{pin::Pin, sync::Arc, net::IpAddr};
 use tonic::{Request, Response, Status, Streaming};
 use futures::{TryStreamExt, StreamExt};
 
@@ -31,6 +32,9 @@ struct Args {
     /// Number of worker threads for Tokio runtime
     #[arg(long, default_value_t = 4)]
     num_workers: usize,
+    /// Port to bind the server to
+    #[arg(long, default_value = "8081")]
+    port: u16,
 }
 
 pub struct FlightDbServer {
@@ -294,9 +298,37 @@ impl FlightService for FlightDbServer {
     }
 }
 
+/// Retrieves the first non-loopback IPv4 address of the host.
+fn get_host_ip() -> Option<IpAddr> {
+    if let Ok(ifaces) = get_if_addrs() {
+        for iface in ifaces {
+            if !iface.is_loopback() {
+                match iface.addr {
+                    get_if_addrs::IfAddr::V4(ipv4) => {
+                        return Some(IpAddr::V4(ipv4.ip));
+                    }
+                    get_if_addrs::IfAddr::V6(_) => {}
+                }
+            }
+        }
+    }
+    None
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command-line arguments
     let args = Args::parse();
+
+    // Retrieve the host IP address
+    let host_ip = get_host_ip().unwrap_or_else(|| {
+        println!("No non-loopback IPv4 address found. Falling back to 127.0.0.1.");
+        "127.0.0.1".parse().unwrap()
+    });
+
+    // Define the address to bind the server to
+    let addr = format!("{}:{}", host_ip, args.port)
+        .parse()
+        .expect("Invalid IP address or port");
 
     // Build Tokio runtime with specified number of worker threads
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -304,13 +336,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .enable_all()
         .build()?;
 
-    println!("Starting Flight server with DB path: {}, shards: {}, num_workers: {}", args.db_path, args.shards, args.num_workers);
+    println!(
+        "Starting Flight server at {} with DB path: {}, shards: {}, num_workers: {}",
+        addr, args.db_path, args.shards, args.num_workers
+    );
 
     rt.block_on(async {
         let start_time = std::time::Instant::now();
         let server = FlightDbServer::new(DatabaseType::RocksDB, &args.db_path, args.shards);
         println!("Server created in {:?}", start_time.elapsed());
-        let addr = "0.0.0.0:8081".parse().unwrap();
+        eprintln!("{}", addr);
         tonic::transport::Server::builder()
             .add_service(FlightServiceServer::new(server))
             .serve(addr)

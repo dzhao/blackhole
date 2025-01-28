@@ -7,7 +7,7 @@ edition = "2021"
 # rocksdb = "0.22"
 rocksdb = { git = "https://github.com/dzhao/rust-rocksdb.git", branch = "capped" }
 criterion = "0.5"
-rand = "0.8"
+rand = "0.9"
 lmdb = "0.8"
 histogram = "0.11"
 murmur3 = "0.5"
@@ -22,6 +22,8 @@ lazy_static = "1.5"
 flatbuffers = "24.12"  # or your preferred version
 serde_json = "1.0"
 blackhole_client = { path = "../client" }
+get_if_addrs = "0.5"
+num_cpus = "1.13"
 [[bench]]
 name = "rocksdb_benchmarks"
 harness = false
