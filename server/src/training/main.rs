@@ -17,6 +17,9 @@ struct Args {
     /// Port to bind the server to
     #[arg(long, default_value = "8081")]
     port: u16,
+    ///whether to register the service in the service discovery directory
+    #[arg(long, default_value = "false")]
+    service_discovery: bool,
 }
 
 /// Retrieves the first non-loopback IPv4 address of the host.
@@ -54,6 +57,6 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .enable_all()
         .build()?;
 
-    rt.block_on(blackhole_server::start_server(addr, args.db_path, args.shards))?;
+    rt.block_on(blackhole_server::start_server(addr, args.db_path, args.shards, args.service_discovery))?;
     Ok(())
 }

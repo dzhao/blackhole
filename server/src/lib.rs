@@ -10,6 +10,9 @@ pub enum DatabaseType {
 use blackhole_client::embedding_generated::embedding::Ticket;
 use tonic::Status;
 use murmur3::murmur3_x64_128;
+use std::fs::OpenOptions;
+use std::io::Write;
+use fs2::FileExt; // Import the fs2 traits for file locking
 impl DatabaseType {
     pub fn create_db(&self, db_path: &str) -> Box<dyn DbInterface> {
         match self {
@@ -21,6 +24,7 @@ impl DatabaseType {
         format!("{}.{:04x}", prefix, u16::MAX - ts)
     }
 }
+const SERVICE_DISCOVERY_DIR: &str = "SERVICE_DISCOVERY";
 pub trait DbInterface: Send + Sync {
     fn db_type(&self) -> String;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
@@ -173,6 +177,7 @@ pub async fn start_server(
     addr: std::net::SocketAddr,
     db_path: String,
     shards: i16,
+    service_discovery: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!(
         "Starting Flight server at {} with DB path: {}, shards: {}",
@@ -180,6 +185,56 @@ pub async fn start_server(
     );
     let start_time = std::time::Instant::now();
     let server = crate::server::FlightDbServer::new(DatabaseType::RocksDB, &db_path, shards);
+    
+    if service_discovery {
+        let service_discovery_path = format!("{}/{}", db_path, SERVICE_DISCOVERY_DIR);
+        if !std::path::Path::new(&service_discovery_path).exists() {
+            std::fs::create_dir_all(&service_discovery_path)?;
+        }
+        for shard in 0..shards {
+            let shard_file_path = format!("{}/{}", service_discovery_path, shard);
+            
+            // Attempt to open the shard file
+            let mut shard_handle = match OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(&shard_file_path)
+            {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!("Failed to open shard {}: {}", shard, e);
+                    continue; // Skip to next shard on error
+                }
+            };
+            
+            // Attempt to acquire an exclusive lock without blocking
+            if let Err(e) = shard_handle.try_lock_exclusive() {
+                eprintln!(
+                    "Shard {} is locked by another process. Skipping...{}",
+                    shard,
+                    e
+                );
+                continue; // Skip to next shard if it's locked
+            }
+
+            // Proceed to write to the shard file
+            if let Err(e) = shard_handle.write_all(addr.to_string().as_bytes()) {
+                eprintln!("Failed to write to shard {}: {}", shard, e);
+                // Optionally, you might want to unlock the file here
+                // shard_handle.unlock()?;
+                continue; // Skip to next shard on write failure
+            }
+
+            // It's good practice to flush the write buffer
+            if let Err(e) = shard_handle.flush() {
+                eprintln!("Failed to flush shard {}: {}", shard, e);
+                continue; // Skip to next shard on flush failure
+            }
+
+            // Optionally, unlock the file if you don't need to hold the lock
+            // shard_handle.unlock()?;
+        }
+    }
     println!("Server created in {:?}", start_time.elapsed());
     
     tonic::transport::Server::builder()
