@@ -173,7 +173,7 @@ pub fn decode_fbs_ticket(
     Ok((ids, feature_tuples))
 }
 
-fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::SocketAddr) -> Option<std::fs::File> {
+fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::SocketAddr) -> Option<(std::fs::File, i16)> {
     for shard in 0..shards {
         let shard_file_path = format!("{}/{}", service_discovery_path, shard);
             
@@ -209,7 +209,7 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
         }
         else {
             println!("Shard {} written to {}", shard, shard_file_path);
-            return Some(shard_handle);
+            return Some((shard_handle, shard));
         }
     }
     None
@@ -220,14 +220,8 @@ pub async fn start_server(
     shards: i16,
     service_discovery: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!(
-        "Starting Flight server at {} with DB path: {}, shards: {}",
-        addr, db_path, shards
-    );
-    let start_time = std::time::Instant::now();
-    let server = crate::server::FlightDbServer::new(DatabaseType::RocksDB, &db_path, shards);
     
-    let lock_lock = if service_discovery {
+    let shard_info = if service_discovery {
         let service_discovery_path = format!("{}/{}", db_path, SERVICE_DISCOVERY_DIR);
         if !std::path::Path::new(&service_discovery_path).exists() {
             std::fs::create_dir(&service_discovery_path)?;
@@ -236,6 +230,16 @@ pub async fn start_server(
     } else {
         None
     };
+    let db_path = match shard_info {
+        Some((_, shard)) => format!("{}/{:0>3}", db_path, shard),
+        _ => db_path
+    };
+    let start_time = std::time::Instant::now();
+    let server = crate::server::FlightDbServer::new(DatabaseType::RocksDB, &db_path);
+    println!(
+        "Starting feature server at {} with DB path: {}, shards: {}",
+        addr, db_path, shards
+    );
     println!("Server created in {:?}", start_time.elapsed());
     
     tonic::transport::Server::builder()

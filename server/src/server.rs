@@ -14,15 +14,13 @@ use crate::{DBUtil, DbInterface, DatabaseType};
 use futures::{TryStreamExt, StreamExt};
 use crate::decode_fbs_ticket;
 pub struct FlightDbServer {
-    dbs: Vec<Box<dyn DbInterface>>,
-    shards: i16,
+    db: Box<dyn DbInterface>,
 }
 
 impl FlightDbServer {
-    pub fn new(db_type: DatabaseType, db_path: &str, shards: i16) -> Self {
+    pub fn new(db_type: DatabaseType, db_path: &str) -> Self {
         Self {
-            dbs: (0..shards).map(|shard| db_type.create_db(&format!("{}/{:0>3}", db_path, shard))).collect(),
-            shards,
+            db: db_type.create_db(db_path),
         }
     }
 
@@ -173,21 +171,20 @@ impl FlightService for FlightDbServer {
                 } else {
                     &format!("{}.{}", id, feature_name)
                 };
-                let db = &self.dbs[DBUtil::shard_for_id(&id, self.shards)? as usize];
                 let values = match (start, end) {
                     (Some(start), Some(end)) => {
-                        db.prefix_seek(prefix, *start as u16, *end as u16)
+                        self.db.prefix_seek(prefix, *start as u16, *end as u16)
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (Some(_), None) => {
                         return Err(Status::not_found("can't have start only"));
                     },
                     (None, Some(end)) => {
-                        db.prefix_seek(prefix, *end as u16, *end as u16)
+                        self.db.prefix_seek(prefix, *end as u16, *end as u16)
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (None, None) => {
-                        DBUtil::flatbuffer_f32_vec(&db.get(prefix).unwrap().unwrap())
+                        DBUtil::flatbuffer_f32_vec(&self.db.get(prefix).unwrap().unwrap())
                     }
                 };
                 if values.is_empty() {
