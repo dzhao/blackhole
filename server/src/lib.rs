@@ -13,6 +13,7 @@ use murmur3::murmur3_x64_128;
 use std::fs::OpenOptions;
 use std::io::Write;
 use fs2::FileExt; // Import the fs2 traits for file locking
+use serde::Serialize;
 impl DatabaseType {
     pub fn create_db(&self, db_path: &str) -> Box<dyn DbInterface> {
         match self {
@@ -79,6 +80,12 @@ impl DBUtil {
         let hash_value = Self::hash_id(id)?;
         Ok((hash_value.rem_euclid(shards as i64 * 24) / 24) as i16)
     }
+}
+
+#[derive(Serialize)]
+pub struct ShardConfig {
+    shards: i16,
+    ip: String,
 }
 
 #[cfg(test)]
@@ -175,7 +182,7 @@ pub fn decode_fbs_ticket(
 
 fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::SocketAddr) -> Option<(std::fs::File, i16)> {
     for shard in 0..shards {
-        let shard_file_path = format!("{}/{}", service_discovery_path, shard);
+        let shard_file_path = format!("{}/{}.json", service_discovery_path, shard);
             
         // Attempt to open the shard file
         let mut shard_handle = match OpenOptions::new()
@@ -200,8 +207,18 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
             continue; // Skip to next shard if it's locked
         }
 
+        let json = match serde_json::to_string_pretty(&ShardConfig {
+            shards, 
+            ip: addr.to_string()
+        }) {
+            Ok(j) => j,
+            Err(e) => {
+                eprintln!("Failed to serialize config for shard {}: {}", shard, e);
+                continue;
+            }
+        };
         // Proceed to write to the shard file
-        if let Err(e) = shard_handle.write_all(addr.to_string().as_bytes()) {
+        if let Err(e) = shard_handle.write_all(json.as_bytes()) {
             eprintln!("Failed to write to shard {}: {}", shard, e);
             // Optionally, you might want to unlock the file here
             // shard_handle.unlock()?;

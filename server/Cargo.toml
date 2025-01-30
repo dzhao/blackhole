@@ -25,6 +25,7 @@ blackhole_client = { path = "../client" }
 get_if_addrs = "0.5"
 num_cpus = "1.13"
 fs2 = "0.4"
+serde = { version = "1.0", features = ["derive"] }
 [[bench]]
 name = "rocksdb_benchmarks"
 harness = false
