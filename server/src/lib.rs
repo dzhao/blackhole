@@ -84,9 +84,9 @@ impl DBUtil {
 
 #[derive(Serialize, serde::Deserialize)]
 pub struct ShardConfig {
-    shards: i16,
-    ip: String,
-    shard: i16,
+    pub shards: i16,
+    pub ip: String,
+    pub shard: i16,
 }
 
 #[cfg(test)]
