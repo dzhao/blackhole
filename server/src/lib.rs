@@ -25,7 +25,7 @@ impl DatabaseType {
         format!("{}.{:04x}", prefix, u16::MAX - ts)
     }
 }
-const SERVICE_DISCOVERY_DIR: &str = "SERVICE_DISCOVERY";
+pub const SERVICE_DISCOVERY_DIR: &str = "SERVICE_DISCOVERY";
 pub trait DbInterface: Send + Sync {
     fn db_type(&self) -> String;
     fn put(&self, key: &[u8], value: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
