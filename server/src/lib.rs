@@ -86,6 +86,7 @@ impl DBUtil {
 pub struct ShardConfig {
     shards: i16,
     ip: String,
+    shard: i16,
 }
 
 #[cfg(test)]
@@ -209,7 +210,8 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
 
         let json = match serde_json::to_string_pretty(&ShardConfig {
             shards, 
-            ip: addr.to_string()
+            ip: addr.to_string(),
+            shard
         }) {
             Ok(j) => j,
             Err(e) => {
