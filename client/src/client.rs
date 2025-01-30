@@ -113,6 +113,7 @@ impl FeatureClient {
         // After successfully obtaining the stream, proceed to process it
         let batches: Vec<RecordBatch> = stream.try_collect().await?;
 
+        let mut idx = 0;
         for rb in batches {
             for i in 0..rb.num_rows() {
                 for field in rb.columns() {
@@ -120,7 +121,8 @@ impl FeatureClient {
                         if let Some(values) =
                             list_array.value(i).as_any().downcast_ref::<Float32Array>()
                         {
-                            callback(i, values.values());
+                            callback(idx, values.values());
+                            idx += 1;
                         }
                     }
                 }
