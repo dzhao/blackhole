@@ -10,7 +10,7 @@ use rand::Rng;
 
 pub fn create_fbs_ticket(
     ids: Vec<String>,
-    features: Vec<(String, Option<i16>, Option<i16>)>,
+    features: &[(String, Option<i16>, Option<i16>)],
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut builder = FlatBufferBuilder::new();
 
@@ -70,11 +70,11 @@ impl FeatureClient {
     pub async fn fetch_features_into<F>(
         &mut self,
         user_ids: Vec<String>,
-        features: Vec<(String, Option<i16>, Option<i16>)>,
+        features: &[(String, Option<i16>, Option<i16>)],
         mut callback: F,
     ) -> Result<(), Box<dyn Error>>
     where
-        F: FnMut(&[f32]),
+        F: FnMut(usize, &[f32]),
     {
         // Retry parameters
         let mut max_retries = 16;
@@ -120,7 +120,7 @@ impl FeatureClient {
                         if let Some(values) =
                             list_array.value(i).as_any().downcast_ref::<Float32Array>()
                         {
-                            callback(values.values());
+                            callback(i, values.values());
                         }
                     }
                 }

@@ -10,21 +10,6 @@ class FeatureClient:
         self.host = host
         self.port = port
         self._connect()
-        # options = [
-            # ('grpc.enable_retries', 1),
-            # ('grpc.keepalive_timeout_ms', wait_timeout * 1000),
-            # ('grpc.service_config', '{"methodConfig": [{ \
-                # "name": [{"service": "arrow.flight.protocol.FlightService"}], \
-                # "waitForReady": true, \
-                # "timeout": "3600s", \
-                # "retryPolicy": { \
-                    # "maxAttempts": 5, \
-                    # "initialBackoff": "1s", \
-                    # "maxBackoff": "10s", \
-                    # "backoffMultiplier": 2, \
-                    # "retryableStatusCodes": ["UNAVAILABLE"] \
-                # }}]}')
-        # ]
     
     def _connect(self):
         location = flight.Location.for_grpc_tcp(self.host, self.port)

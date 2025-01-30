@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ],
     );
         let mut results = vec![];
-        client.fetch_features_into(ids, features, |values| results.extend_from_slice(values)).await?;
+        client.fetch_features_into(ids, &features, |_, values| results.extend_from_slice(values)).await?;
         println!("{results:?}, {}", results.len());
     }
     Ok(())
