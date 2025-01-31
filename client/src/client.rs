@@ -60,22 +60,22 @@ pub struct FeatureClient {
 }
 
 impl FeatureClient {
-    pub async fn new(url: String) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(url: &str) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self { client: Mutex::new(Self::create_client(url).await?) })
     }
 
-    async fn create_client(url: String) -> Result<FlightClient, Box<dyn std::error::Error>> {
+    async fn create_client(url: &str) -> Result<FlightClient, Box<dyn std::error::Error>> {
         let url = if !url.starts_with("http://") {
             format!("http://{}", url)
         } else {
-            url
+            url.to_string()
         };
         Ok(FlightClient::new(
             Channel::from_shared(url)?.connect_lazy()
         ))
     }
 
-    pub async fn re_init(&self, url: String) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn re_init(&self, url: &str) -> Result<(), Box<dyn std::error::Error>> {
         *self.client.lock().await = Self::create_client(url).await?;
         Ok(())
     }
