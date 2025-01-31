@@ -4,14 +4,14 @@ use tonic::transport::Channel;
 use flatbuffers::FlatBufferBuilder;
 use crate::embedding_generated::embedding::{Ticket as FbsTicket, TicketArgs};
 use tokio::{sync::Mutex, time::{sleep, Duration}};
-use std::error::Error;
+use anyhow::Result;
 use rand::Rng;
 use futures::stream::TryStreamExt;
 
 pub fn create_fbs_ticket(
     ids: Vec<String>,
     features: &[(String, Option<i16>, Option<i16>)],
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> Result<Vec<u8>> {
     let mut builder = FlatBufferBuilder::new();
 
     // Convert IDs to flatbuffer string offsets
@@ -52,7 +52,7 @@ pub fn create_fbs_ticket(
 
     builder.finish(ticket, None);
 
-    Ok(builder.finished_data().to_vec().into())
+    Ok(builder.finished_data().to_vec())
 }
 
 pub struct FeatureClient {
@@ -60,22 +60,24 @@ pub struct FeatureClient {
 }
 
 impl FeatureClient {
-    pub async fn new(url: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self { client: Mutex::new(Self::create_client(url).await?) })
+    pub async fn new(url: &str) -> Result<Self> {
+        Ok(Self {
+            client: Mutex::new(Self::create_client(url).await?),
+        })
     }
 
-    async fn create_client(url: &str) -> Result<FlightClient, Box<dyn std::error::Error>> {
+    async fn create_client(url: &str) -> Result<FlightClient> {
         let url = if !url.starts_with("http://") {
             format!("http://{}", url)
         } else {
             url.to_string()
         };
-        Ok(FlightClient::new(
-            Channel::from_shared(url)?.connect_lazy()
-        ))
+        let channel = Channel::from_shared(url)?;
+        let channel = channel.connect_lazy();
+        Ok(FlightClient::new(channel))
     }
 
-    pub async fn re_init(&self, url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn re_init(&self, url: &str) -> Result<()> {
         *self.client.lock().await = Self::create_client(url).await?;
         Ok(())
     }
@@ -85,7 +87,7 @@ impl FeatureClient {
         user_ids: Vec<String>,
         features: &[(String, Option<i16>, Option<i16>)],
         mut callback: F,
-    ) -> Result<(), Box<dyn Error>>
+    ) -> Result<()>
     where
         F: FnMut(usize, &[f32]),
     {
@@ -106,11 +108,12 @@ impl FeatureClient {
                 Err(e) => {
                     if max_retries == 0 {
                         eprintln!("All retry attempts failed: {}", e);
-                        return Err(Box::new(e));
+                        return Err(anyhow::anyhow!(e));
                     } else {
                         // Add jitter to the delay (+/-10%)
                         let jitter_factor = rand::thread_rng().gen_range(0.9..1.1);
-                        let jittered_delay = Duration::from_secs_f64(delay.as_secs_f64() * jitter_factor);
+                        let jittered_delay =
+                            Duration::from_secs_f64(delay.as_secs_f64() * jitter_factor);
 
                         eprintln!(
                             "do_get failed: {}. Retrying in {:?}... ({} retries left)",
