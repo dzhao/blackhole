@@ -1,12 +1,12 @@
 use arrow::{array::{Array, Float32Array, ListArray}, record_batch::RecordBatch};
 use arrow_flight::{FlightClient, Ticket};
-use futures::stream::TryStreamExt;
 use tonic::transport::Channel;
 use flatbuffers::FlatBufferBuilder;
 use crate::embedding_generated::embedding::{Ticket as FbsTicket, TicketArgs};
-use tokio::time::{sleep, Duration};
+use tokio::{sync::Mutex, time::{sleep, Duration}};
 use std::error::Error;
 use rand::Rng;
+use futures::stream::TryStreamExt;
 
 pub fn create_fbs_ticket(
     ids: Vec<String>,
@@ -56,19 +56,32 @@ pub fn create_fbs_ticket(
 }
 
 pub struct FeatureClient {
-    client: FlightClient,
+    client: Mutex<FlightClient>,
 }
 
 impl FeatureClient {
-    pub async fn init(url: String) -> Result<Self, Box<dyn std::error::Error>> {
-        let client = FlightClient::new(
+    pub async fn new(url: String) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Self { client: Mutex::new(Self::create_client(url).await?) })
+    }
+
+    async fn create_client(url: String) -> Result<FlightClient, Box<dyn std::error::Error>> {
+        let url = if !url.starts_with("http://") {
+            format!("http://{}", url)
+        } else {
+            url
+        };
+        Ok(FlightClient::new(
             Channel::from_shared(url)?.connect_lazy()
-        );
-        Ok(Self { client })
+        ))
+    }
+
+    pub async fn re_init(&self, url: String) -> Result<(), Box<dyn std::error::Error>> {
+        *self.client.lock().await = Self::create_client(url).await?;
+        Ok(())
     }
 
     pub async fn fetch_features_into<F>(
-        &mut self,
+        &self,
         user_ids: Vec<String>,
         features: &[(String, Option<i16>, Option<i16>)],
         mut callback: F,
@@ -87,7 +100,8 @@ impl FeatureClient {
         };
 
         let stream = loop {
-            match self.client.do_get(ticket.clone()).await {
+            let mut client = self.client.lock().await;
+            match client.do_get(ticket.clone()).await {
                 Ok(s) => break s,
                 Err(e) => {
                     if max_retries == 0 {
@@ -102,6 +116,8 @@ impl FeatureClient {
                             "do_get failed: {}. Retrying in {:?}... ({} retries left)",
                             e, jittered_delay, max_retries
                         );
+                        // Drop the client to release the lock
+                        drop(client);
                         sleep(jittered_delay).await;
                         delay *= 2; // Exponential backoff
                         max_retries -= 1; // Decrement retry counter
