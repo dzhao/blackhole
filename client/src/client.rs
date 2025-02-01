@@ -96,15 +96,39 @@ impl FeatureClient {
         let mut delay = Duration::from_secs(1);
 
         // Prepare the ticket outside the retry loop
+        let ids_len = user_ids.len();
         let ticket = create_fbs_ticket(user_ids, features)?;
         let ticket = Ticket {
             ticket: ticket.into(),
         };
 
-        let stream = loop {
+        loop {
             let mut client = self.client.lock().await;
             match client.do_get(ticket.clone()).await {
-                Ok(s) => break s,
+                Ok(s) => {
+                    let batches: Vec<RecordBatch> = s.try_collect().await?;
+
+                    let mut idx = 0;
+                    for rb in batches {
+                        for i in 0..rb.num_rows() {
+                            for field in rb.columns() {
+                                if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
+                                    if let Some(values) =
+                                        list_array.value(i).as_any().downcast_ref::<Float32Array>()
+                                    {
+                                        callback(idx, values.values());
+                                        idx += 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if idx != ids_len {
+                        eprint!("writen len:{} doesn't match id len{}", idx, ids_len);
+                        continue;
+                    }
+                    break;
+                },
                 Err(e) => {
                     if max_retries == 0 {
                         eprintln!("All retry attempts failed: {}", e);
@@ -129,24 +153,6 @@ impl FeatureClient {
             }
         };
 
-        // After successfully obtaining the stream, proceed to process it
-        let batches: Vec<RecordBatch> = stream.try_collect().await?;
-
-        let mut idx = 0;
-        for rb in batches {
-            for i in 0..rb.num_rows() {
-                for field in rb.columns() {
-                    if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
-                        if let Some(values) =
-                            list_array.value(i).as_any().downcast_ref::<Float32Array>()
-                        {
-                            callback(idx, values.values());
-                            idx += 1;
-                        }
-                    }
-                }
-            }
-        }
 
         Ok(())
     }
