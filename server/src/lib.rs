@@ -209,22 +209,24 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
             );
             continue; // Skip to next shard if it's locked
         }
-
-        match serde_json::to_writer_pretty(&mut shard_handle, &ShardConfig {
+        let mut buf_writer = std::io::BufWriter::new(&mut shard_handle);
+        if let Err(e) = serde_json::to_writer_pretty(&mut buf_writer, &ShardConfig {
             shards, 
             ip: addr.to_string(),
             shard
         }) {
-            Ok(_) => {
-                shard_handle.flush().expect("flush failed");
-                println!("Shard {} written to {}", shard, shard_file_path);
-                return Some((shard_handle, shard));
-            },
-            Err(e) => {
-                eprintln!("Failed to write config for shard {}: {}", shard, e);
-                continue;
-            }
+            eprintln!("Failed to write config for shard {}: {}", shard, e);
+            continue;
         }
+        
+        if let Err(e) = buf_writer.flush() {
+            eprintln!("Failed to flush shard {}: {}", shard, e);
+            continue;
+        }
+        
+        println!("Shard {} written to {}", shard, shard_file_path);
+        drop(buf_writer);
+        return Some((shard_handle, shard));
     }
     None
 }
