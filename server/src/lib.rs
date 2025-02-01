@@ -189,7 +189,7 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
         // Attempt to open the shard file
         let mut shard_handle = match OpenOptions::new()
             .write(true)
-            // .truncate(true)
+            .truncate(true)
             .create(true)
             .open(&shard_file_path)
         {
