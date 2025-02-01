@@ -189,7 +189,6 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
         // Attempt to open the shard file
         let mut shard_handle = match OpenOptions::new()
             .write(true)
-            .truncate(true)
             .create(true)
             .open(&shard_file_path)
         {
@@ -208,6 +207,10 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
                 e
             );
             continue; // Skip to next shard if it's locked
+        }
+        if let Err(e) = shard_handle.set_len(0) {
+            eprintln!("Failed to truncate shard {}: {}", shard, e);
+            continue;
         }
         let mut buf_writer = std::io::BufWriter::new(&mut shard_handle);
         if let Err(e) = serde_json::to_writer_pretty(&mut buf_writer, &ShardConfig {
