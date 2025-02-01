@@ -188,6 +188,7 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
         // Attempt to open the shard file
         let mut shard_handle = match OpenOptions::new()
             .write(true)
+            .truncate(true)
             .create(true)
             .open(&shard_file_path)
         {
@@ -237,13 +238,13 @@ pub async fn start_server(
     addr: std::net::SocketAddr,
     db_path: String,
     shards: i16,
-    service_discovery: bool,
+    cluster: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     
-    let shard_info = if service_discovery {
-        let service_discovery_path = format!("{}/{}", db_path, SERVICE_DISCOVERY_DIR);
+    let shard_info = if !cluster.is_empty() {
+        let service_discovery_path = format!("{}/{}/{}", db_path, SERVICE_DISCOVERY_DIR, cluster);
         if !std::path::Path::new(&service_discovery_path).exists() {
-            std::fs::create_dir(&service_discovery_path)?;
+            std::fs::create_dir_all(&service_discovery_path)?;
         }
         find_shard_file(shards, &service_discovery_path, addr)
     } else {
