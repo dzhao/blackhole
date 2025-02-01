@@ -210,13 +210,13 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
             continue; // Skip to next shard if it's locked
         }
 
-        match serde_json::to_writer_pretty(std::io::BufWriter::new(&mut shard_handle), &ShardConfig {
+        match serde_json::to_writer_pretty(&mut shard_handle, &ShardConfig {
             shards, 
             ip: addr.to_string(),
             shard
         }) {
             Ok(_) => {
-                shard_handle.flush().unwrap();
+                shard_handle.flush().expect("flush failed");
                 println!("Shard {} written to {}", shard, shard_file_path);
                 return Some((shard_handle, shard));
             },
