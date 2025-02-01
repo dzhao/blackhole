@@ -8,6 +8,7 @@ pub enum DatabaseType {
 }
 
 use blackhole_client::embedding_generated::embedding::Ticket;
+use futures::io::BufWriter;
 use tonic::Status;
 use murmur3::murmur3_x64_128;
 use std::fs::OpenOptions;
@@ -188,7 +189,7 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
         // Attempt to open the shard file
         let mut shard_handle = match OpenOptions::new()
             .write(true)
-            .truncate(true)
+            // .truncate(true)
             .create(true)
             .open(&shard_file_path)
         {
@@ -209,27 +210,20 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
             continue; // Skip to next shard if it's locked
         }
 
-        let json = match serde_json::to_string_pretty(&ShardConfig {
+        match serde_json::to_writer_pretty(std::io::BufWriter::new(&mut shard_handle), &ShardConfig {
             shards, 
             ip: addr.to_string(),
             shard
         }) {
-            Ok(j) => j,
+            Ok(_) => {
+                shard_handle.flush().unwrap();
+                println!("Shard {} written to {}", shard, shard_file_path);
+                return Some((shard_handle, shard));
+            },
             Err(e) => {
-                eprintln!("Failed to serialize config for shard {}: {}", shard, e);
+                eprintln!("Failed to write config for shard {}: {}", shard, e);
                 continue;
             }
-        };
-        // Proceed to write to the shard file
-        if let Err(e) = shard_handle.write_all(json.as_bytes()) {
-            eprintln!("Failed to write to shard {}: {}", shard, e);
-            // Optionally, you might want to unlock the file here
-            // shard_handle.unlock()?;
-            continue; // Skip to next shard on write failure
-        }
-        else {
-            println!("Shard {} written to {}", shard, shard_file_path);
-            return Some((shard_handle, shard));
         }
     }
     None
