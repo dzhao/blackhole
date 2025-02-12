@@ -184,7 +184,10 @@ impl FlightService for FlightDbServer {
                             .map_err(|e| Status::internal(e.to_string()))?
                     },
                     (None, None) => {
-                        DBUtil::flatbuffer_f32_vec(&self.db.get(prefix).unwrap().unwrap())
+                        self.db.get(prefix)
+                        .map_err(|e| Status::internal(e.to_string()))?
+                        .map(|bytes| DBUtil::flatbuffer_f32_vec(&bytes))
+                        .unwrap_or(vec![Some(0.0)])
                     }
                 };
                 if values.is_empty() {
