@@ -13,6 +13,7 @@ use futures::{Stream, stream};
 use crate::{DBUtil, DbInterface, DatabaseType};
 use futures::{TryStreamExt, StreamExt};
 use crate::decode_fbs_ticket;
+use crate::metrics::{TOTAL_REQUESTS, TOTAL_HITS, TOTAL_KEYS};
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
 }
@@ -154,9 +155,10 @@ impl FlightService for FlightDbServer {
         &self,
         request: Request<Ticket>,
     ) -> Result<Response<Self::DoGetStream>, Status> {
+        TOTAL_REQUESTS.inc();
         let ticket = request.into_inner().ticket;
         let (ids, features) = decode_fbs_ticket(&ticket).map_err(|e| Status::internal(e.to_string()))?;
-
+        TOTAL_KEYS.inc_by(ids.len() as f64);
         let schema = Arc::new(Schema::new(vec![Field::new(
             "embedding",
             DataType::List(Arc::new(Field::new("item", DataType::Float32, true))),
@@ -187,7 +189,10 @@ impl FlightService for FlightDbServer {
                         self.db.get(prefix)
                         .map_err(|e| Status::internal(e.to_string()))?
                         .map(|bytes| DBUtil::flatbuffer_f32_vec(&bytes))
-                        .unwrap_or(vec![Some(0.0)])
+                        .unwrap_or_else(|| {
+                            TOTAL_MISSES.inc();
+                            vec![Some(0.0)]
+                        })
                     }
                 };
                 if values.is_empty() {

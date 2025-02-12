@@ -2,6 +2,7 @@ pub mod common;
 pub mod lmdb;
 pub mod rocksdb;
 pub mod server;
+pub mod metrics;
 pub enum DatabaseType {
     RocksDB,
     LMDB,

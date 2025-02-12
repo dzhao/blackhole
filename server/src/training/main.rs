@@ -1,17 +1,14 @@
-pub mod metrics;
-
 use clap::Parser;
 use get_if_addrs::get_if_addrs;
 use std::net::IpAddr;
 use prometheus::Encoder;
 use prometheus::TextEncoder;
-use reqwest;
 use axum::response::IntoResponse;
 use axum::http::StatusCode;
 use axum::serve;
 use tokio::net::TcpListener;
 
-use crate::metrics::{init_metrics, REGISTRY, TOTAL_ERRORS};
+use blackhole_server::metrics::{init_metrics, REGISTRY, TOTAL_ERRORS};
 
 /// Command-line arguments for the Flight server.
 #[derive(Parser, Debug)]
