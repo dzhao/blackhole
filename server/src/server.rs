@@ -13,7 +13,7 @@ use futures::{Stream, stream};
 use crate::{DBUtil, DbInterface, DatabaseType};
 use futures::{TryStreamExt, StreamExt};
 use crate::decode_fbs_ticket;
-use crate::metrics::{TOTAL_REQUESTS, TOTAL_HITS, TOTAL_KEYS};
+use crate::metrics::{TOTAL_REQUESTS, TOTAL_MISSES, TOTAL_KEYS};
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
 }
