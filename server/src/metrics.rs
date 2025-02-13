@@ -15,4 +15,6 @@ pub fn init_metrics() {
     REGISTRY.register(Box::new(TOTAL_ERRORS.clone())).unwrap();
     REGISTRY.register(Box::new(TOTAL_KEYS.clone())).unwrap();
     REGISTRY.register(Box::new(TOTAL_MISSES.clone())).unwrap();
+    REGISTRY.register(Box::new(TOTAL_EMPTY_KEYS.clone())).unwrap();
+
 } 
