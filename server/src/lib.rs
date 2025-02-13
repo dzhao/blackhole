@@ -183,10 +183,15 @@ pub fn decode_fbs_ticket(
     Ok((ids, feature_tuples))
 }
 
-fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::SocketAddr) -> Option<(std::fs::File, i16)> {
-    for shard in 0..shards {
+fn shard_files(service_discovery_path: &str, shard: i16) -> (String, String, String) {
         let shard_file_path = format!("{}/{}.json", service_discovery_path, shard);
         let shard_lock_path = format!("{}/{}.LOCK", service_discovery_path, shard);
+        let tmp_path = format!("{}/{}.json.tmp", service_discovery_path, shard);
+        (shard_file_path, shard_lock_path, tmp_path)
+}
+fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::SocketAddr) -> Option<(std::fs::File, i16)> {
+    for shard in 0..shards {
+        let (_, shard_lock_path, tmp_path) = shard_files(service_discovery_path, shard);
             
         // Attempt to open the shard file
         let shard_lock_handle = match OpenOptions::new()
@@ -210,39 +215,31 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
             );
             continue; // Skip to next shard if it's locked
         }
-        let tmp_path = format!("{}/{}.json.tmp", service_discovery_path, shard);
-        let mut tmp_file = match OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&tmp_path) {
-                Ok(file) => file,
-                Err(e) => {
-                    eprintln!("Failed to create temp file for {}: {}", tmp_path, e);
-                    continue;
-                }
-            };
-        
-        let mut buf_writer = std::io::BufWriter::new(&mut tmp_file);
-        if let Err(e) = serde_json::to_writer_pretty(&mut buf_writer, &ShardConfig {
-            shards,
-            ip: addr.to_string(), 
-            shard
-        }) {
-            eprintln!("Failed to write config for shard {}: {}", shard, e);
-            continue;
-        }
-        drop(buf_writer);
-        
-        if let Err(e) = std::fs::rename(&tmp_path, &shard_file_path) {
-            eprintln!("Failed to rename temp file for shard {}: {}", shard, e);
-            continue;
-        }
-        
-        println!("Shard {} written to {}", shard, shard_file_path);
-        return Some((shard_lock_handle, shard));
+        return Some((shard_lock_handle, shard))    
     }
     None
+}
+pub fn commit_config_file(
+    service_discovery_path: &str, 
+    shard: i16,
+    shards: i16,
+    addr: std::net::SocketAddr
+) -> Result<(), std::io::Error> {
+    let (shard_file_path, _, tmp_path) = shard_files(service_discovery_path, shard);
+    let mut tmp_file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&tmp_path)?;
+        
+    let mut buf_writer = std::io::BufWriter::new(&mut tmp_file);
+    serde_json::to_writer_pretty(&mut buf_writer, &ShardConfig {
+        shards,
+        ip: addr.to_string(),
+        shard
+    })?;
+    println!("Write shard {} to {}", shard, shard_file_path);
+    std::fs::rename(&tmp_path, &shard_file_path)
 }
 pub async fn start_server(
     addr: std::net::SocketAddr,
@@ -251,8 +248,8 @@ pub async fn start_server(
     cluster: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     
+    let service_discovery_path = format!("{}/{}/{}", db_path, SERVICE_DISCOVERY_DIR, cluster);
     let shard_info = if !cluster.is_empty() {
-        let service_discovery_path = format!("{}/{}/{}", db_path, SERVICE_DISCOVERY_DIR, cluster);
         if !std::path::Path::new(&service_discovery_path).exists() {
             std::fs::create_dir_all(&service_discovery_path)?;
         }
@@ -270,8 +267,10 @@ pub async fn start_server(
         "Starting feature server at {} with DB path: {}, shards: {}",
         addr, db_path, shards
     );
-    println!("Server created in {:?}", start_time.elapsed());
-    
+    println!(" Db Server created in {:?}", start_time.elapsed());
+    if let Some((_, shard)) = shard_info {
+        commit_config_file(&service_discovery_path, shard, shards, addr).unwrap();
+    }
     tonic::transport::Server::builder()
         .add_service(arrow_flight::flight_service_server::FlightServiceServer::new(server))
         .serve(addr)
