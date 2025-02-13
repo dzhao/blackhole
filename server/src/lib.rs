@@ -186,22 +186,23 @@ pub fn decode_fbs_ticket(
 fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::SocketAddr) -> Option<(std::fs::File, i16)> {
     for shard in 0..shards {
         let shard_file_path = format!("{}/{}.json", service_discovery_path, shard);
+        let shard_lock_path = format!("{}/{}.LOCK", service_discovery_path, shard);
             
         // Attempt to open the shard file
-        let mut shard_handle = match OpenOptions::new()
-            .write(true)
+        let shard_lock_handle = match OpenOptions::new()
             .create(true)
-            .open(&shard_file_path)
+            .write(true)
+            .open(&shard_lock_path)
         {
             Ok(file) => file,
             Err(e) => {
-                eprintln!("Failed to open shard {}: {}", shard, e);
+                eprintln!("Failed to open file {}: {}", shard_lock_path, e);
                 continue; // Skip to next shard on error
             }
         };
             
         // Attempt to acquire an exclusive lock without blocking
-        if let Err(e) = shard_handle.try_lock_exclusive() {
+        if let Err(e) = shard_lock_handle.try_lock_exclusive() {
             eprintln!(
                 "Shard {} is locked by another process. Skipping...{}",
                 shard,
@@ -209,28 +210,37 @@ fn find_shard_file(shards: i16, service_discovery_path: &str, addr: std::net::So
             );
             continue; // Skip to next shard if it's locked
         }
-        if let Err(e) = shard_handle.set_len(0) {
-            eprintln!("Failed to truncate shard {}: {}", shard, e);
-            continue;
-        }
-        let mut buf_writer = std::io::BufWriter::new(&mut shard_handle);
+        let tmp_path = format!("{}/{}.json.tmp", service_discovery_path, shard);
+        let mut tmp_file = match OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&tmp_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    eprintln!("Failed to create temp file for {}: {}", tmp_path, e);
+                    continue;
+                }
+            };
+        
+        let mut buf_writer = std::io::BufWriter::new(&mut tmp_file);
         if let Err(e) = serde_json::to_writer_pretty(&mut buf_writer, &ShardConfig {
-            shards, 
-            ip: addr.to_string(),
+            shards,
+            ip: addr.to_string(), 
             shard
         }) {
             eprintln!("Failed to write config for shard {}: {}", shard, e);
             continue;
         }
+        drop(buf_writer);
         
-        if let Err(e) = buf_writer.flush() {
-            eprintln!("Failed to flush shard {}: {}", shard, e);
+        if let Err(e) = std::fs::rename(&tmp_path, &shard_file_path) {
+            eprintln!("Failed to rename temp file for shard {}: {}", shard, e);
             continue;
         }
         
         println!("Shard {} written to {}", shard, shard_file_path);
-        drop(buf_writer);
-        return Some((shard_handle, shard));
+        return Some((shard_lock_handle, shard));
     }
     None
 }
