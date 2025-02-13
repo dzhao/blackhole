@@ -7,6 +7,7 @@ lazy_static! {
     pub static ref TOTAL_KEYS: Counter = Counter::new("total_keys", "Total keys").unwrap();
     pub static ref TOTAL_MISSES: Counter = Counter::new("total_misses", "Total misses").unwrap();
     pub static ref TOTAL_ERRORS: Counter = Counter::new("total_errors", "Total errors").unwrap();
+    pub static ref TOTAL_EMPTY_KEYS: Counter = Counter::new("total_empty_keys", "Total empty keys").unwrap();
 }
 
 pub fn init_metrics() {

@@ -13,7 +13,7 @@ use futures::{Stream, stream};
 use crate::{DBUtil, DbInterface, DatabaseType};
 use futures::{TryStreamExt, StreamExt};
 use crate::decode_fbs_ticket;
-use crate::metrics::{TOTAL_REQUESTS, TOTAL_MISSES, TOTAL_KEYS};
+use crate::metrics::{TOTAL_REQUESTS, TOTAL_MISSES, TOTAL_KEYS, TOTAL_EMPTY_KEYS};
 pub struct FlightDbServer {
     db: Box<dyn DbInterface>,
 }
@@ -167,6 +167,9 @@ impl FlightService for FlightDbServer {
 
         let mut array_arrays = features.iter().map(|_| vec![]).collect::<Vec<_>>();
         for id in ids {
+            if id.is_empty() {
+                TOTAL_EMPTY_KEYS.inc();
+            }
             for (i, (feature_name, start, end)) in features.iter().enumerate() {
                 let prefix = if feature_name.is_empty() {
                     &id
