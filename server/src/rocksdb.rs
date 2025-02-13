@@ -17,9 +17,9 @@ impl DbInterface for RocksDbWrapper {
 
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
         let res = self.0.get(key.as_bytes())?;
-        if res.is_none() {
-            println!("key:{key}, value:None");
-        }
+        // if res.is_none() {
+            // println!("key:{key}, value:None");
+        // }
         Ok(res)
     }
 
