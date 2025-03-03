@@ -89,7 +89,7 @@ impl FeatureClient {
         mut callback: F,
     ) -> Result<()>
     where
-        F: FnMut(usize, &[f32]),
+        F: FnMut(usize, usize, &[f32]),
     {
         // Retry parameters
         let mut max_retries = 16;
@@ -108,23 +108,23 @@ impl FeatureClient {
                 Ok(s) => {
                     let batches: Vec<RecordBatch> = s.try_collect().await?;
 
-                    let mut idx = 0;
+                    let mut row = 0;
                     for rb in batches {
                         for i in 0..rb.num_rows() {
-                            for field in rb.columns() {
+                            for (col, field) in rb.columns().into_iter().enumerate() {
                                 if let Some(list_array) = field.as_any().downcast_ref::<ListArray>() {
                                     if let Some(values) =
                                         list_array.value(i).as_any().downcast_ref::<Float32Array>()
                                     {
-                                        callback(idx, values.values());
-                                        idx += 1;
+                                        callback(row, col, values.values());
+                                        row += 1;
                                     }
                                 }
                             }
                         }
                     }
-                    if idx != ids_len {
-                        eprint!("writen len:{} doesn't match id len{}", idx, ids_len);
+                    if row != ids_len {
+                        eprint!("writen len:{} doesn't match id len{}", row, ids_len);
                         continue;
                     }
                     break;
