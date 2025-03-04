@@ -117,10 +117,10 @@ impl FeatureClient {
                                         list_array.value(i).as_any().downcast_ref::<Float32Array>()
                                     {
                                         callback(row, col, values.values());
-                                        row += 1;
                                     }
                                 }
                             }
+                            row += 1;
                         }
                     }
                     if row != ids_len {
