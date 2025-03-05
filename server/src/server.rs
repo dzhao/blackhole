@@ -1,6 +1,7 @@
 use arrow::array::{Array, Int16Array, ListArray, RecordBatch, StringArray, StructArray};
 use arrow::datatypes::{DataType, Field, Float32Type, Schema};
 use arrow::ipc::reader::StreamReader;
+use arrow::ipc::Feature;
 use arrow_flight::{
     encode::FlightDataEncoderBuilder,
     flight_service_server::FlightService,
@@ -159,11 +160,11 @@ impl FlightService for FlightDbServer {
         let ticket = request.into_inner().ticket;
         let (ids, features) = decode_fbs_ticket(&ticket).map_err(|e| Status::internal(e.to_string()))?;
         TOTAL_KEYS.inc_by(ids.len() as f64);
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "embedding",
+        let schema = Arc::new(Schema::new(features.iter().map(|(feature, _, _)| Field::new(
+            feature,
             DataType::List(Arc::new(Field::new("item", DataType::Float32, true))),
             true,
-        )]));
+        )).collect::<Vec<Field>>()));
 
         let mut array_arrays = features.iter().map(|_| vec![]).collect::<Vec<_>>();
         for id in ids {
